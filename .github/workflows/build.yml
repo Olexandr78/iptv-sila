@@ -1,4 +1,4 @@
-name: IPTV-SILA Windows
+name: IPTV-SILA Windows desktop
 on:
   workflow_dispatch:
   push:
@@ -13,14 +13,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install -r requirements-build.txt
-      - name: Build portable Windows app
-        run: pyinstaller --noconfirm --clean --onedir --name IPTV-SILA --add-data "web;web" server.py
-      - name: Add example configuration
+      - name: Install desktop dependencies
+        run: python -m pip install -r requirements-build.txt
+      - name: Build Windows GUI client and LAN server
+        run: pyinstaller --noconfirm --clean --windowed --onedir --name IPTV-SILA --collect-all PySide6 app.py
+      - name: Package portable app
         shell: pwsh
-        run: Copy-Item config.example.json dist/IPTV-SILA/config.example.json
+        run: |
+          Copy-Item README.md dist/IPTV-SILA/README.txt
+          Compress-Archive -Path dist/IPTV-SILA -DestinationPath IPTV-SILA-Windows-x64.zip -Force
       - uses: actions/upload-artifact@v4
         with:
-          name: IPTV-SILA-Windows-x64
-          path: dist/IPTV-SILA/
+          name: IPTV-SILA-Windows-x64-Desktop-Client-and-Server
+          path: IPTV-SILA-Windows-x64.zip
           if-no-files-found: error

@@ -9,9 +9,11 @@ import android.view.ViewGroup
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AlertDialog
-import androidx.core.view.setPadding
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import java.net.HttpURLConnection
 import java.net.URL
@@ -34,54 +36,110 @@ class MainActivity : AppCompatActivity() {
     private lateinit var playerView: PlayerView
     private var channels: List<Channel> = emptyList()
 
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = android.graphics.Color.rgb(11,18,32)
-        window.navigationBarColor = android.graphics.Color.rgb(11,18,32)
-        player = ExoPlayer.Builder(this).build()
+        window.statusBarColor = android.graphics.Color.rgb(11, 18, 32)
+        window.navigationBarColor = android.graphics.Color.rgb(11, 18, 32)
+        player = ExoPlayer.Builder(this).build().also { exo ->
+            exo.addListener(object : Player.Listener {
+                override fun onPlayerError(error: PlaybackException) {
+                    status.text = "Не удалось воспроизвести канал: ${error.errorCodeName}. Проверь доступность потока."
+                }
+            })
+        }
         buildUi()
     }
 
     private fun buildUi() {
-        root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(16); setBackgroundColor(0xFF0B1220.toInt()) }
-        val scroll = ScrollView(this)
-        val page = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        scroll.addView(page)
-        root.addView(scroll, ViewGroup.LayoutParams(-1, 0).also { it.height = 0 })
-        val header = TextView(this).apply { text = "📺 IPTV-СИЛА"; textSize = 24f; setTextColor(-1); gravity = Gravity.CENTER_VERTICAL; setPadding(0,8,0,16) }
+        root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16))
+            setBackgroundColor(0xFF0B1220.toInt())
+        }
+        val scroll = ScrollView(this).apply { isFillViewport = true }
+        val page = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, 0, 0, dp(20))
+        }
+        scroll.addView(page, ViewGroup.LayoutParams(-1, -2))
+        root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+
+        val header = TextView(this).apply {
+            text = "📺 IPTV-СИЛА"
+            textSize = 26f
+            setTextColor(-1)
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(12), 0, dp(18))
+        }
         page.addView(header)
-        val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        actions.addView(actionButton("Источники") { showSources() }, LinearLayout.LayoutParams(0, -2, 1f))
-        actions.addView(actionButton("Открыть M3U") { openPlaylist() }, LinearLayout.LayoutParams(0, -2, 1f))
+
+        val actions = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+        actions.addView(actionButton("Источники") { showSources() },
+            LinearLayout.LayoutParams(0, dp(56), 1f).apply { marginEnd = dp(6) })
+        actions.addView(actionButton("Открыть M3U") { openPlaylist() },
+            LinearLayout.LayoutParams(0, dp(56), 1f).apply { marginStart = dp(6) })
         page.addView(actions)
-        status = TextView(this).apply { text = "Выбери источник или открой свой M3U-плейлист"; setTextColor(0xFFB8C5D8.toInt()); setPadding(0,12,0,12) }
+
+        status = TextView(this).apply {
+            text = "Выбери источник или открой свой M3U-плейлист"
+            textSize = 15f
+            setTextColor(0xFFB8C5D8.toInt())
+            setPadding(0, dp(14), 0, dp(14))
+        }
         page.addView(status)
-        playerView = PlayerView(this).apply { player = this@MainActivity.player; useController = true }
-        page.addView(playerView, LinearLayout.LayoutParams(-1, 210))
-        val search = EditText(this).apply { hint = "Поиск канала"; setTextColor(-1); setHintTextColor(0xFF9EABC0.toInt()) }
-        page.addView(search)
+
+        playerView = PlayerView(this).apply {
+            player = this@MainActivity.player
+            useController = true
+            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+            setBackgroundColor(0xFF000000.toInt())
+        }
+        page.addView(playerView, LinearLayout.LayoutParams(-1, dp(260)))
+
+        val search = EditText(this).apply {
+            hint = "Поиск канала"
+            textSize = 16f
+            setSingleLine(true)
+            setTextColor(-1)
+            setHintTextColor(0xFF9EABC0.toInt())
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+        }
+        page.addView(search, LinearLayout.LayoutParams(-1, dp(58)))
+
         channelList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         page.addView(channelList)
+
         search.addTextChangedListener(object : android.text.TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { renderChannels(s.toString()) }
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                renderChannels(s.toString())
+            }
             override fun afterTextChanged(s: android.text.Editable?) {}
         })
-        root.removeView(scroll)
-        root.addView(scroll, ViewGroup.LayoutParams(-1, -1))
         setContentView(root)
     }
 
     private fun actionButton(label: String, click: () -> Unit) = Button(this).apply {
-        text = label; setTextColor(-1); setBackgroundColor(0xFF24639A.toInt()); setOnClickListener { click() }
+        text = label
+        textSize = 15f
+        isAllCaps = false
+        setTextColor(-1)
+        setBackgroundColor(0xFF24639A.toInt())
+        setOnClickListener { click() }
     }
 
     private fun showSources() {
         val items = sources.map { "${it.name}\n${it.description}" }.toTypedArray()
-        AlertDialog.Builder(this).setTitle("🇺🇦 Украинские IPTV-источники")
+        AlertDialog.Builder(this)
+            .setTitle("🇺🇦 Украинские IPTV-источники")
             .setItems(items) { _, which -> loadUrl(sources[which].url) }
             .setNeutralButton("Проверить все") { _, _ -> checkSources() }
-            .setNegativeButton("Закрыть", null).show()
+            .setNegativeButton("Закрыть", null)
+            .show()
     }
 
     private fun checkSources() {
@@ -92,7 +150,9 @@ class MainActivity : AppCompatActivity() {
                     val text = download(source.url)
                     val count = text.lineSequence().count { it.trimStart().startsWith("#EXTINF", true) }
                     "${source.name}: доступен, каналов: $count"
-                } catch (e: Exception) { "${source.name}: ошибка — ${e.message ?: "недоступен"}" }
+                } catch (e: Exception) {
+                    "${source.name}: ошибка — ${e.message ?: "недоступен"}"
+                }
             }.joinToString("\n")
             runOnUiThread { status.text = report }
         }
@@ -100,7 +160,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun openPlaylist() {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-            addCategory(Intent.CATEGORY_OPENABLE); type = "*/*"
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
             putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("audio/x-mpegurl", "application/vnd.apple.mpegurl", "text/plain"))
         }
         startActivityForResult(intent, 41)
@@ -111,8 +172,12 @@ class MainActivity : AppCompatActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == 41 && resultCode == Activity.RESULT_OK) data?.data?.let { uri ->
             executor.execute {
-                try { val text = contentResolver.openInputStream(uri)!!.bufferedReader().use { it.readText() }; runOnUiThread { parseAndShow(text, uri.toString()) } }
-                catch (e: Exception) { runOnUiThread { status.text = "Не удалось открыть плейлист: ${e.message}" } }
+                try {
+                    val text = contentResolver.openInputStream(uri)!!.bufferedReader().use { it.readText() }
+                    runOnUiThread { parseAndShow(text, uri.toString()) }
+                } catch (e: Exception) {
+                    runOnUiThread { status.text = "Не удалось открыть плейлист: ${e.message}" }
+                }
             }
         }
     }
@@ -120,22 +185,32 @@ class MainActivity : AppCompatActivity() {
     private fun loadUrl(url: String) {
         status.text = "Загружаю плейлист…"
         executor.execute {
-            try { val text = download(url); runOnUiThread { parseAndShow(text, url) } }
-            catch (e: Exception) { runOnUiThread { status.text = "Ошибка загрузки: ${e.message}" } }
+            try {
+                val text = download(url)
+                runOnUiThread { parseAndShow(text, url) }
+            } catch (e: Exception) {
+                runOnUiThread { status.text = "Ошибка загрузки: ${e.message}" }
+            }
         }
     }
 
     private fun download(address: String): String {
         val connection = URL(address).openConnection() as HttpURLConnection
-        connection.connectTimeout = 15000; connection.readTimeout = 20000
+        connection.connectTimeout = 15000
+        connection.readTimeout = 20000
         connection.setRequestProperty("User-Agent", "IPTV-SILA-Android/1.0")
-        return connection.inputStream.bufferedReader().use { it.readText() }.also { connection.disconnect() }
+        return try {
+            connection.inputStream.bufferedReader().use { it.readText() }
+        } finally {
+            connection.disconnect()
+        }
     }
 
     private fun parseAndShow(text: String, base: String) {
         val result = mutableListOf<Channel>()
-        var name = "Без названия"; var group = ""
-        text.lineSequence().forEach { raw ->
+        var name = "Без названия"
+        var group = ""
+        text.removePrefix("\uFEFF").lineSequence().forEach { raw ->
             val line = raw.trim()
             when {
                 line.startsWith("#EXTINF", true) -> {
@@ -143,7 +218,16 @@ class MainActivity : AppCompatActivity() {
                     group = Regex("group-title=\"([^\"]*)\"").find(line)?.groupValues?.get(1).orEmpty()
                 }
                 line.isNotBlank() && !line.startsWith("#") -> {
-                    try { result.add(Channel(name, group, URL(URL(base), line).toString())) } catch (_: Exception) {}
+                    try {
+                        val resolved = if (line.startsWith("http://", true) || line.startsWith("https://", true)) {
+                            line
+                        } else {
+                            URL(URL(base), line).toString()
+                        }
+                        result.add(Channel(name, group, resolved))
+                    } catch (_: Exception) {
+                        // Skip malformed playlist entries instead of crashing the app.
+                    }
                 }
             }
         }
@@ -154,22 +238,56 @@ class MainActivity : AppCompatActivity() {
 
     private fun renderChannels(filter: String = "") {
         channelList.removeAllViews()
-        channels.filter { it.name.contains(filter, true) || it.group.contains(filter, true) }.take(500).forEach { channel ->
+        val visible = channels.filter {
+            it.name.contains(filter, true) || it.group.contains(filter, true)
+        }.take(500)
+        visible.forEach { channel ->
             val button = Button(this).apply {
                 text = if (channel.group.isBlank()) channel.name else "${channel.name}  ·  ${channel.group}"
-                isAllCaps = false; gravity = Gravity.START or Gravity.CENTER_VERTICAL
-                setTextColor(-1); setBackgroundColor(0xFF151F31.toInt())
-                setOnClickListener {
-                    player?.setMediaItem(MediaItem.fromUri(channel.url)); player?.prepare(); player?.play()
-                    status.text = "Сейчас играет: ${channel.name}"
-                }
+                textSize = 14f
+                isAllCaps = false
+                gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                minHeight = dp(58)
+                setPadding(dp(14), dp(8), dp(14), dp(8))
+                setTextColor(-1)
+                setBackgroundColor(0xFF151F31.toInt())
+                setOnClickListener { playChannel(channel) }
             }
-            channelList.addView(button, LinearLayout.LayoutParams(-1, -2))
+            channelList.addView(button, LinearLayout.LayoutParams(-1, dp(64)).apply {
+                bottomMargin = dp(5)
+            })
+        }
+        if (visible.isEmpty()) {
+            val empty = TextView(this).apply {
+                text = if (channels.isEmpty()) "Сначала загрузи IPTV-плейлист" else "Каналы не найдены"
+                textSize = 16f
+                setTextColor(0xFFB8C5D8.toInt())
+                setPadding(dp(8), dp(18), dp(8), dp(18))
+            }
+            channelList.addView(empty)
+        }
+    }
+
+    private fun playChannel(channel: Channel) {
+        try {
+            status.text = "Подключаюсь: ${channel.name}"
+            val uri = Uri.parse(channel.url)
+            require(uri.scheme == "http" || uri.scheme == "https") { "Неподдерживаемый адрес потока" }
+            val exo = player ?: return
+            exo.stop()
+            exo.clearMediaItems()
+            exo.setMediaItem(MediaItem.fromUri(uri))
+            exo.prepare()
+            exo.playWhenReady = true
+        } catch (e: Exception) {
+            status.text = "Ошибка запуска канала: ${e.message ?: e.javaClass.simpleName}"
         }
     }
 
     override fun onDestroy() {
-        player?.release(); player = null; executor.shutdownNow()
+        player?.release()
+        player = null
+        executor.shutdownNow()
         super.onDestroy()
     }
 }

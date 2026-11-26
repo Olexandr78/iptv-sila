@@ -4,12 +4,13 @@ import json
 import os
 import re
 import socket
+import sys
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
-ROOT = Path(__file__).resolve().parent
-WEB = ROOT / "web"
+ROOT = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
+WEB = Path(getattr(sys, "_MEIPASS", ROOT)) / "web"
 CONFIG = ROOT / "config.json"
 DEFAULT_CONFIG = {"playlist_url": "", "playlist_file": "playlist.m3u", "port": 8765}
 

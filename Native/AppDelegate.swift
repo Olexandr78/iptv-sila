@@ -393,26 +393,6 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
         }
     }
 
-    private func loadPlaylist(from url: URL, title: String, status: UILabel) {
-        status.text = "Загружаю \(title)…"
-        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                if let error = error { self.statusLabel.text = "Ошибка: \(error.localizedDescription)"; return }
-                guard let data = data, let text = String(data: data, encoding: .utf8) else {
-                    self.statusLabel.text = "Не удалось прочитать плейлист"; return
-                }
-                if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
-                    self.statusLabel.text = "Сервер ответил HTTP \(http.statusCode)"; return
-                }
-                self.channels = self.parseM3U(text, baseURL: url)
-                self.filtered = self.channels
-                self.channelTable.reloadData()
-                self.statusLabel.text = "Каналов: \(self.channels.count)"
-            }
-        }.resume()
-    }
-
     private func parseM3U(_ text: String, baseURL: URL? = nil) -> [Channel] {
         let lines = text.components(separatedBy: .newlines)
         var result: [Channel] = []

@@ -142,7 +142,7 @@ class MainActivity : AppCompatActivity() {
                     group = Regex("group-title=\"([^\"]*)\"").find(line)?.groupValues?.get(1).orEmpty()
                 }
                 line.isNotBlank() && !line.startsWith("#") -> {
-                    try { result.add(Channel(name, group, Uri.parse(Uri.withAppendedPath(Uri.parse(base), "").toString()).let { URL(URL(base), line).toString() })) } catch (_: Exception) {}
+                    try { result.add(Channel(name, group, URL(URL(base), line).toString())) } catch (_: Exception) {}
                 }
             }
         }

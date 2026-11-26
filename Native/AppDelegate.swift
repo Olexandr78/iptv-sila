@@ -388,9 +388,7 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
         let controller = AVPlayerViewController()
         controller.player = player
         controller.modalPresentationStyle = .fullScreen
-        present(controller, animated: true) {
-            player.play()
-        }
+        present(controller, animated: true)
     }
 
     private func parseM3U(_ text: String, baseURL: URL? = nil) -> [Channel] {

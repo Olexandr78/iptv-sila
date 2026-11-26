@@ -1,0 +1,72 @@
+name: Build IPTV-SILA
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  windows:
+    name: Windows portable server and client
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements-build.txt
+      - name: Build portable folder
+        run: pyinstaller --noconfirm --clean --onedir --name IPTV-SILA --add-data "web;web" server.py
+      - name: Include example configuration
+        run: Copy-Item config.example.json dist/IPTV-SILA/config.example.json
+        shell: pwsh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IPTV-SILA-Windows-x64
+          path: dist/IPTV-SILA/
+          if-no-files-found: error
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - run: npm install
+      - run: npm run prepare
+      - run: npx cap add android
+      - run: npx cap sync android
+      - run: cd android && chmod +x gradlew && ./gradlew assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IPTV-SILA-Android-debug-APK
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+  ios-simulator:
+    name: iOS Simulator build (unsigned)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm install
+      - run: npm run prepare
+      - run: npx cap add ios
+      - run: npx cap sync ios
+      - name: Build for iOS Simulator
+        run: xcodebuild -project ios/App/App.xcodeproj -scheme App -sdk iphonesimulator -configuration Debug -derivedDataPath build CODE_SIGNING_ALLOWED=NO
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IPTV-SILA-iOS-Simulator-unsigned
+          path: build/Build/Products/Debug-iphonesimulator/App.app
+          if-no-files-found: error

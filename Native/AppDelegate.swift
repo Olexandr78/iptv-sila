@@ -82,7 +82,6 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
         } else if !saved.isEmpty {
             loadPlaylist()
         }
-        catsPlayer?.play()
     }
 
     override func viewDidLayoutSubviews() {
@@ -329,7 +328,7 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
         sourcesTable.separatorColor = .darkGray
         sourcesTable.rowHeight = 62
         sourcesTable.heightAnchor.constraint(equalToConstant: 260).isActive = true
-        let sourceStack = UIStackView(arrangedSubviews: [sourceTitle, sourceHint, serverField, connect, customSourceField, customSourceButton, sourceCheck, sourcesStatus, sourcesTable])
+        let sourceStack = UIStackView(arrangedSubviews: [serverField, connect, sourceTitle, sourceHint, customSourceField, customSourceButton, sourceCheck, sourcesStatus, sourcesTable])
         sourceStack.axis = .vertical
         sourceStack.spacing = 10
         sourceStack.translatesAutoresizingMaskIntoConstraints = false
@@ -346,7 +345,6 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
     @objc private func changeTab(_ sender: UISegmentedControl) {
         currentTab = sender.selectedSegmentIndex
         let tvHidden = currentTab != 0
-        serverField.isHidden = tvHidden
         searchField.isHidden = tvHidden
         statusLabel.isHidden = tvHidden
         channelTable.isHidden = tvHidden

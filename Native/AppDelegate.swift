@@ -52,7 +52,10 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
     private let sourcesView = UIView()
     private let sourcesTable = UITableView()
     private let sourcesStatus = UILabel()
+    private let customSourceField = UITextField()
     private let scrollView = UIScrollView()
+    private var tabs: UISegmentedControl!
+    private let videoPlaceholder = UILabel()
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -96,7 +99,7 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
             root.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8)
         ])
 
-        let tabs = UISegmentedControl(items: ["ТВ", "🇺🇦 Источники", "🐈 Кошачий ТВ"])
+        tabs = UISegmentedControl(items: ["ТВ", "🇺🇦 Источники", "🐈 Кошачий ТВ"])
         tabs.selectedSegmentIndex = 0
         tabs.addTarget(self, action: #selector(changeTab(_:)), for: .valueChanged)
         root.addArrangedSubview(tabs)
@@ -150,8 +153,21 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
 
         videoContainer.backgroundColor = .black
         videoContainer.layer.cornerRadius = 12
+        videoContainer.layer.borderWidth = 1
+        videoContainer.layer.borderColor = UIColor(white: 0.35, alpha: 1).cgColor
         videoContainer.clipsToBounds = true
-        videoContainer.heightAnchor.constraint(equalTo: videoContainer.widthAnchor, multiplier: 9.0/16.0).isActive = true
+        videoContainer.heightAnchor.constraint(equalToConstant: 190).isActive = true
+        videoPlaceholder.text = "▶  Здесь будет видео канала"
+        videoPlaceholder.textColor = UIColor(white: 0.72, alpha: 1)
+        videoPlaceholder.textAlignment = .center
+        videoPlaceholder.font = .systemFont(ofSize: 15, weight: .medium)
+        videoPlaceholder.translatesAutoresizingMaskIntoConstraints = false
+        videoContainer.addSubview(videoPlaceholder)
+        NSLayoutConstraint.activate([
+            videoPlaceholder.leadingAnchor.constraint(equalTo: videoContainer.leadingAnchor, constant: 8),
+            videoPlaceholder.trailingAnchor.constraint(equalTo: videoContainer.trailingAnchor, constant: -8),
+            videoPlaceholder.centerYAnchor.constraint(equalTo: videoContainer.centerYAnchor)
+        ])
         stack.addArrangedSubview(videoContainer)
         nowPlaying.text = "Выбери канал"
         nowPlaying.textColor = .white
@@ -233,6 +249,17 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
         sourceHint.textColor = .lightGray
         sourceHint.font = .systemFont(ofSize: 12)
         sourceHint.numberOfLines = 0
+        style(customSourceField, placeholder: "URL своего M3U/M3U8-сервера")
+        customSourceField.keyboardType = .URL
+        customSourceField.delegate = self
+        customSourceField.text = UserDefaults.standard.string(forKey: "customSourceURL")
+        let customSourceButton = UIButton(type: .system)
+        customSourceButton.setTitle("Добавить / загрузить свой сервер", for: .normal)
+        customSourceButton.setTitleColor(.white, for: .normal)
+        customSourceButton.backgroundColor = UIColor(red: 36/255, green: 99/255, blue: 154/255, alpha: 1)
+        customSourceButton.layer.cornerRadius = 10
+        customSourceButton.heightAnchor.constraint(equalToConstant: 42).isActive = true
+        customSourceButton.addTarget(self, action: #selector(loadCustomSource), for: .touchUpInside)
         let sourceCheck = UIButton(type: .system)
         sourceCheck.setTitle("Проверить все источники", for: .normal)
         sourceCheck.setTitleColor(.white, for: .normal)
@@ -250,7 +277,7 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
         sourcesTable.separatorColor = .darkGray
         sourcesTable.rowHeight = 62
         sourcesTable.heightAnchor.constraint(equalToConstant: 260).isActive = true
-        let sourceStack = UIStackView(arrangedSubviews: [sourceTitle, sourceHint, sourceCheck, sourcesStatus, sourcesTable])
+        let sourceStack = UIStackView(arrangedSubviews: [sourceTitle, sourceHint, customSourceField, customSourceButton, sourceCheck, sourcesStatus, sourcesTable])
         sourceStack.axis = .vertical
         sourceStack.spacing = 10
         sourceStack.translatesAutoresizingMaskIntoConstraints = false
@@ -375,6 +402,8 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
         nowPlaying.text = channel.name
         player?.pause()
         playerLayer?.removeFromSuperlayer()
+        videoPlaceholder.isHidden = true
+        videoContainer.layoutIfNeeded()
         let item = AVPlayerItem(url: channel.url)
         player = AVPlayer(playerItem: item)
         let layer = AVPlayerLayer(player: player)
@@ -387,22 +416,42 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
     }
 
     private func loadSource(_ source: IPTVSource) {
-        sourcesStatus.text = "Загружаю \(source.name)…"
-        URLSession.shared.dataTask(with: source.url) { [weak self] data, response, error in
+        loadPlaylist(from: source.url, title: source.name, status: sourcesStatus)
+    }
+
+    @objc private func loadCustomSource() {
+        view.endEditing(true)
+        guard let raw = customSourceField.text?.trimmingCharacters(in: .whitespacesAndNewlines),
+              let url = URL(string: raw), ["http", "https"].contains(url.scheme?.lowercased() ?? ""), url.host != nil else {
+            sourcesStatus.text = "Введи корректный HTTP(S) URL плейлиста M3U/M3U8"
+            return
+        }
+        UserDefaults.standard.set(raw, forKey: "customSourceURL")
+        loadPlaylist(from: url, title: "Мой сервер", status: sourcesStatus)
+    }
+
+    private func loadPlaylist(from url: URL, title: String, status: UILabel) {
+        status.text = "Загружаю \(title)…"
+        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
             DispatchQueue.main.async {
                 guard let self = self else { return }
-                if let error = error { self.sourcesStatus.text = "Ошибка: \(error.localizedDescription)"; return }
+                if let error = error { status.text = "Ошибка: \(error.localizedDescription)"; return }
                 guard let data = data, let text = String(data: data, encoding: .utf8) else {
-                    self.sourcesStatus.text = "Не удалось прочитать M3U"; return
+                    status.text = "Не удалось прочитать M3U"; return
                 }
                 if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
-                    self.sourcesStatus.text = "HTTP \(http.statusCode)"; return
+                    status.text = "HTTP \(http.statusCode)"; return
                 }
-                self.channels = self.parseM3U(text)
-                self.filtered = self.channels
+                let parsed = self.parseM3U(text)
+                guard !parsed.isEmpty else { status.text = "Плейлист пустой или не содержит корректных M3U-каналов"; return }
+                self.channels = parsed
+                self.filtered = parsed
+                self.searchField.text = ""
                 self.channelTable.reloadData()
-                self.statusLabel.text = "Каналов: \(self.channels.count) · \(source.name)"
-                self.sourcesStatus.text = "Загружено каналов: \(self.channels.count)"
+                self.statusLabel.text = "Каналов: \(self.channels.count) · \(title)"
+                status.text = "Загружено каналов: \(self.channels.count). Перехожу к ТВ…"
+                self.tabs.selectedSegmentIndex = 0
+                self.changeTab(self.tabs)
             }
         }.resume()
     }

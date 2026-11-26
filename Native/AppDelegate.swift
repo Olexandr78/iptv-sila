@@ -145,16 +145,64 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
 
         catsView.backgroundColor = UIColor(red: 7/255, green: 90/255, blue: 156/255, alpha: 1)
         catsView.layer.cornerRadius = 18
+        catsView.clipsToBounds = true
         catsView.heightAnchor.constraint(equalToConstant: 330).isActive = true
+
+        let catTitle = UILabel()
+        catTitle.text = "КОШАЧИЙ ТВ"
+        catTitle.textColor = .white
+        catTitle.font = .boldSystemFont(ofSize: 24)
+        catTitle.translatesAutoresizingMaskIntoConstraints = false
+        catsView.addSubview(catTitle)
+
+        let cat = UILabel()
+        cat.text = "🐈"
+        cat.font = .systemFont(ofSize: 92)
+        cat.translatesAutoresizingMaskIntoConstraints = false
+        catsView.addSubview(cat)
+
         let fish = UILabel()
-        fish.text = "🐟       🦋"
-        fish.font = .systemFont(ofSize: 64)
+        fish.text = "🐟       🦋       🐟"
+        fish.font = .systemFont(ofSize: 34)
         fish.translatesAutoresizingMaskIntoConstraints = false
         catsView.addSubview(fish)
+
         NSLayoutConstraint.activate([
+            catTitle.centerXAnchor.constraint(equalTo: catsView.centerXAnchor),
+            catTitle.topAnchor.constraint(equalTo: catsView.topAnchor, constant: 24),
+            cat.centerXAnchor.constraint(equalTo: catsView.centerXAnchor),
+            cat.centerYAnchor.constraint(equalTo: catsView.centerYAnchor),
             fish.centerXAnchor.constraint(equalTo: catsView.centerXAnchor),
-            fish.centerYAnchor.constraint(equalTo: catsView.centerYAnchor)
+            fish.bottomAnchor.constraint(equalTo: catsView.bottomAnchor, constant: -24)
         ])
+
+        let colorCycle = CAKeyframeAnimation(keyPath: "backgroundColor")
+        colorCycle.values = [
+            UIColor(red: 7/255, green: 90/255, blue: 156/255, alpha: 1).cgColor,
+            UIColor(red: 18/255, green: 116/255, blue: 178/255, alpha: 1).cgColor,
+            UIColor(red: 16/255, green: 130/255, blue: 128/255, alpha: 1).cgColor,
+            UIColor(red: 7/255, green: 90/255, blue: 156/255, alpha: 1).cgColor
+        ]
+        colorCycle.duration = 18
+        colorCycle.repeatCount = .infinity
+        catsView.layer.add(colorCycle, forKey: "slowBlueWater")
+
+        let catBob = CABasicAnimation(keyPath: "transform.translation.y")
+        catBob.fromValue = -5
+        catBob.toValue = 5
+        catBob.duration = 3.5
+        catBob.autoreverses = true
+        catBob.repeatCount = .infinity
+        cat.layer.add(catBob, forKey: "gentleFloat")
+
+        let fishDrift = CABasicAnimation(keyPath: "transform.translation.x")
+        fishDrift.fromValue = -18
+        fishDrift.toValue = 18
+        fishDrift.duration = 7
+        fishDrift.autoreverses = true
+        fishDrift.repeatCount = .infinity
+        fish.layer.add(fishDrift, forKey: "fishDrift")
+
         catsView.isHidden = true
         stack.addArrangedSubview(catsView)
     }

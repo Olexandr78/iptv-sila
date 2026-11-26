@@ -15,6 +15,18 @@ android {
         versionName = "1.0.0"
     }
 
+    flavorDimensions += "device"
+    productFlavors {
+        create("standard") {
+            dimension = "device"
+        }
+        create("tv") {
+            dimension = "device"
+            applicationIdSuffix = ".tv"
+            versionNameSuffix = "-tv"
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

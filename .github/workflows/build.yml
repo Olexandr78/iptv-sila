@@ -1,0 +1,45 @@
+name: IPTV-SILA iOS 12
+on:
+  workflow_dispatch:
+  push:
+    branches: [ios]
+permissions:
+  contents: read
+jobs:
+  ios-unsigned:
+    name: Build unsigned iOS 12-compatible IPA
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Prepare Cordova web app
+        run: |
+          mkdir -p www
+          cp -R web/. www/
+      - name: Install Cordova toolchain
+        run: |
+          npm install --global cordova@11
+          cordova platform add ios@6.2.0
+      - name: Build for physical iOS devices without signing
+        run: |
+          xcodebuild -project platforms/ios/IPTV-SILA.xcodeproj \
+            -scheme IPTV-SILA \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            IPHONEOS_DEPLOYMENT_TARGET=12.0 \
+            CODE_SIGNING_ALLOWED=NO
+      - name: Package unsigned IPA for jailbroken devices
+        run: |
+          APP_PATH="$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name '*.app' -print -quit)"
+          test -n "$APP_PATH"
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/
+          /usr/bin/zip -qry IPTV-SILA-iOS12-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IPTV-SILA-iOS12-unsigned-IPA
+          path: IPTV-SILA-iOS12-unsigned.ipa
+          if-no-files-found: error

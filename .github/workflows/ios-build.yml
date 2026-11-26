@@ -6,15 +6,32 @@ on:
 permissions:
   contents: read
 jobs:
+  ios-device:
+    name: Build unsigned native iPhone IPA (iOS 12+)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build for physical iPhone
+        run: xcodebuild -project IPTV-SILA.xcodeproj -scheme IPTV-SILA -sdk iphoneos -configuration Release -derivedDataPath build-device CODE_SIGNING_ALLOWED=NO IPHONEOS_DEPLOYMENT_TARGET=12.0
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p Payload
+          cp -R build-device/Build/Products/Release-iphoneos/IPTV-SILA.app Payload/
+          /usr/bin/zip -qry IPTV-SILA-iOS-unsigned-iOS12.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IPTV-SILA-iPhone-unsigned-IPA-iOS12
+          path: IPTV-SILA-iOS-unsigned-iOS12.ipa
+          if-no-files-found: error
   ios-simulator:
     name: Build native Swift app for iOS Simulator
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - name: Build app
-        run: xcodebuild -project IPTV-SILA.xcodeproj -scheme IPTV-SILA -sdk iphonesimulator -configuration Debug -derivedDataPath build CODE_SIGNING_ALLOWED=NO
+        run: xcodebuild -project IPTV-SILA.xcodeproj -scheme IPTV-SILA -sdk iphonesimulator -configuration Debug -derivedDataPath build-simulator CODE_SIGNING_ALLOWED=NO IPHONEOS_DEPLOYMENT_TARGET=12.0
       - uses: actions/upload-artifact@v4
         with:
           name: IPTV-SILA-iOS-Simulator-app
-          path: build/Build/Products/Debug-iphonesimulator/IPTV-SILA.app
+          path: build-simulator/Build/Products/Debug-iphonesimulator/IPTV-SILA.app
           if-no-files-found: error

@@ -11,6 +11,13 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Prepare offline cat video and app icon
+        run: |
+          set -euo pipefail
+          brew install librsvg
+          rsvg-convert -w 1024 -h 1024 Assets.xcassets/AppIcon.appiconset/AppIcon.svg -o Assets.xcassets/AppIcon.appiconset/AppIcon.png
+          curl -fL --retry 3 --connect-timeout 20 "https://cdn.openai.com/sora/videos/cat-on-bed.mp4" -o Native/cat-on-bed.mp4
+          test -s Native/cat-on-bed.mp4
       - name: Build for physical iPhone
         run: xcodebuild -project IPTV-SILA.xcodeproj -scheme IPTV-SILA -sdk iphoneos -configuration Release -derivedDataPath build-device CODE_SIGNING_ALLOWED=NO IPHONEOS_DEPLOYMENT_TARGET=12.0
       - name: Ad-hoc sign app for jailbroken devices

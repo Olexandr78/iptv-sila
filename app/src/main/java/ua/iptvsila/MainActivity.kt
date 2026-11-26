@@ -13,13 +13,15 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.Executors
 
-private data class Channel(val name: String, val group: String, val url: String)
+private data class Channel(val name: String, val group: String, val url: String, val headers: Map<String, String> = emptyMap())
 private data class Source(val name: String, val description: String, val url: String)
 
 class MainActivity : AppCompatActivity() {
@@ -210,12 +212,23 @@ class MainActivity : AppCompatActivity() {
         val result = mutableListOf<Channel>()
         var name = "Без названия"
         var group = ""
+        val pendingHeaders = linkedMapOf<String, String>()
         text.removePrefix("\uFEFF").lineSequence().forEach { raw ->
             val line = raw.trim()
             when {
                 line.startsWith("#EXTINF", true) -> {
                     name = line.substringAfterLast(',').trim().ifBlank { "Без названия" }
                     group = Regex("group-title=\"([^\"]*)\"").find(line)?.groupValues?.get(1).orEmpty()
+                    pendingHeaders.clear()
+                }
+                line.startsWith("#EXTVLCOPT:", true) -> {
+                    val option = line.substringAfter(':')
+                    val key = option.substringBefore('=').trim().lowercase()
+                    val value = option.substringAfter('=', "").trim()
+                    when (key) {
+                        "http-user-agent" -> if (value.isNotBlank()) pendingHeaders["User-Agent"] = value
+                        "http-referrer", "http-referer" -> if (value.isNotBlank()) pendingHeaders["Referer"] = value
+                    }
                 }
                 line.isNotBlank() && !line.startsWith("#") -> {
                     try {
@@ -224,7 +237,8 @@ class MainActivity : AppCompatActivity() {
                         } else {
                             URL(URL(base), line).toString()
                         }
-                        result.add(Channel(name, group, resolved))
+                        result.add(Channel(name, group, resolved, pendingHeaders.toMap()))
+                        pendingHeaders.clear()
                     } catch (_: Exception) {
                         // Skip malformed playlist entries instead of crashing the app.
                     }
@@ -276,7 +290,14 @@ class MainActivity : AppCompatActivity() {
             val exo = player ?: return
             exo.stop()
             exo.clearMediaItems()
-            exo.setMediaItem(MediaItem.fromUri(uri))
+            val requestHeaders = linkedMapOf("User-Agent" to "IPTV-SILA-Android/1.0").apply {
+                putAll(channel.headers)
+            }
+            val dataSourceFactory = DefaultHttpDataSource.Factory()
+                .setDefaultRequestProperties(requestHeaders)
+            val mediaSource = DefaultMediaSourceFactory(dataSourceFactory)
+                .createMediaSource(MediaItem.fromUri(uri))
+            exo.setMediaSource(mediaSource)
             exo.prepare()
             exo.playWhenReady = true
         } catch (e: Exception) {

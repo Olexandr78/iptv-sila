@@ -34,6 +34,11 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
     private var player: AVPlayer?
     private var playerLayer: AVPlayerLayer?
     private var playerItemObservation: NSKeyValueObservation?
+    private var catsPlayer: AVQueuePlayer?
+    private var catsLooper: AVPlayerLooper?
+    private var catsLayer: AVPlayerLayer?
+    private weak var catsVideoContainerReference: UIView?
+    private weak var catVideoStatusReference: UILabel?
     private var currentTab = 0
     private let sources: [IPTVSource] = [
         IPTVSource(name: "iptv-org — Украина", detail: "Открытые каналы Украины", url: URL(string: "https://iptv-org.github.io/iptv/countries/ua.m3u")!),
@@ -68,11 +73,13 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
         let saved = UserDefaults.standard.string(forKey: "serverURL") ?? ""
         serverField.text = saved
         if !saved.isEmpty { loadPlaylist() }
+        catsPlayer?.play()
     }
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         playerLayer?.frame = videoContainer.bounds
+        catsLayer?.frame = catsVideoContainerReference?.bounds ?? .zero
     }
 
     private func style(_ field: UITextField, placeholder: String) {
@@ -120,19 +127,6 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
             stack.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor)
         ])
 
-        style(serverField, placeholder: "Адрес сервера, например http://192.168.1.20:8765")
-        serverField.keyboardType = .URL
-        serverField.delegate = self
-        stack.addArrangedSubview(serverField)
-        let connect = UIButton(type: .system)
-        connect.setTitle("Подключить сервер", for: .normal)
-        connect.setTitleColor(.white, for: .normal)
-        connect.backgroundColor = UIColor(red: 36/255, green: 99/255, blue: 154/255, alpha: 1)
-        connect.layer.cornerRadius = 10
-        connect.heightAnchor.constraint(equalToConstant: 42).isActive = true
-        connect.addTarget(self, action: #selector(connectServer), for: .touchUpInside)
-        stack.addArrangedSubview(connect)
-
         style(searchField, placeholder: "Поиск канала…")
         searchField.delegate = self
         searchField.addTarget(self, action: #selector(searchChanged), for: .editingChanged)
@@ -175,66 +169,63 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
         nowPlaying.font = .boldSystemFont(ofSize: 18)
         stack.addArrangedSubview(nowPlaying)
 
-        catsView.backgroundColor = UIColor(red: 7/255, green: 90/255, blue: 156/255, alpha: 1)
+        catsView.backgroundColor = UIColor(red: 7/255, green: 20/255, blue: 38/255, alpha: 1)
         catsView.layer.cornerRadius = 18
         catsView.clipsToBounds = true
         catsView.heightAnchor.constraint(equalToConstant: 330).isActive = true
 
         let catTitle = UILabel()
-        catTitle.text = "КОШАЧИЙ ТВ"
+        catTitle.text = "КОШАЧИЙ ТВ · ВИДЕО"
         catTitle.textColor = .white
-        catTitle.font = .boldSystemFont(ofSize: 24)
-        catTitle.translatesAutoresizingMaskIntoConstraints = false
-        catsView.addSubview(catTitle)
+        catTitle.font = .boldSystemFont(ofSize: 22)
+        catTitle.textAlignment = .center
 
-        let cat = UILabel()
-        cat.text = "🐈"
-        cat.font = .systemFont(ofSize: 92)
-        cat.translatesAutoresizingMaskIntoConstraints = false
-        catsView.addSubview(cat)
-
-        let fish = UILabel()
-        fish.text = "🐟       🦋       🐟"
-        fish.font = .systemFont(ofSize: 34)
-        fish.translatesAutoresizingMaskIntoConstraints = false
-        catsView.addSubview(fish)
-
+        let catVideoContainer = UIView()
+        catVideoContainer.backgroundColor = .black
+        catVideoContainer.layer.cornerRadius = 12
+        catVideoContainer.clipsToBounds = true
+        catVideoContainer.translatesAutoresizingMaskIntoConstraints = false
+        let catVideoStatus = UILabel()
+        catVideoStatus.text = "Загружаю видео с кошками…"
+        catVideoStatus.textColor = .white
+        catVideoStatus.textAlignment = .center
+        catVideoStatus.font = .systemFont(ofSize: 14)
+        catVideoStatus.translatesAutoresizingMaskIntoConstraints = false
+        catVideoContainer.addSubview(catVideoStatus)
         NSLayoutConstraint.activate([
-            catTitle.centerXAnchor.constraint(equalTo: catsView.centerXAnchor),
-            catTitle.topAnchor.constraint(equalTo: catsView.topAnchor, constant: 24),
-            cat.centerXAnchor.constraint(equalTo: catsView.centerXAnchor),
-            cat.centerYAnchor.constraint(equalTo: catsView.centerYAnchor),
-            fish.centerXAnchor.constraint(equalTo: catsView.centerXAnchor),
-            fish.bottomAnchor.constraint(equalTo: catsView.bottomAnchor, constant: -24)
+            catVideoStatus.centerXAnchor.constraint(equalTo: catVideoContainer.centerXAnchor),
+            catVideoStatus.centerYAnchor.constraint(equalTo: catVideoContainer.centerYAnchor)
+        ])
+        let catCredit = UILabel()
+        catCredit.text = "Видео: NickyPe · Pixabay Content License"
+        catCredit.textColor = .lightGray
+        catCredit.font = .systemFont(ofSize: 11)
+        catCredit.textAlignment = .center
+
+        let catStack = UIStackView(arrangedSubviews: [catTitle, catVideoContainer, catCredit])
+        catStack.axis = .vertical
+        catStack.spacing = 12
+        catStack.translatesAutoresizingMaskIntoConstraints = false
+        catsView.addSubview(catStack)
+        NSLayoutConstraint.activate([
+            catStack.leadingAnchor.constraint(equalTo: catsView.leadingAnchor, constant: 12),
+            catStack.trailingAnchor.constraint(equalTo: catsView.trailingAnchor, constant: -12),
+            catStack.topAnchor.constraint(equalTo: catsView.topAnchor, constant: 16),
+            catStack.bottomAnchor.constraint(lessThanOrEqualTo: catsView.bottomAnchor, constant: -16),
+            catVideoContainer.heightAnchor.constraint(equalToConstant: 245)
         ])
 
-        let colorCycle = CAKeyframeAnimation(keyPath: "backgroundColor")
-        colorCycle.values = [
-            UIColor(red: 7/255, green: 90/255, blue: 156/255, alpha: 1).cgColor,
-            UIColor(red: 18/255, green: 116/255, blue: 178/255, alpha: 1).cgColor,
-            UIColor(red: 16/255, green: 130/255, blue: 128/255, alpha: 1).cgColor,
-            UIColor(red: 7/255, green: 90/255, blue: 156/255, alpha: 1).cgColor
-        ]
-        colorCycle.duration = 18
-        colorCycle.repeatCount = .infinity
-        catsView.layer.add(colorCycle, forKey: "slowBlueWater")
-
-        let catBob = CABasicAnimation(keyPath: "transform.translation.y")
-        catBob.fromValue = -5
-        catBob.toValue = 5
-        catBob.duration = 3.5
-        catBob.autoreverses = true
-        catBob.repeatCount = .infinity
-        cat.layer.add(catBob, forKey: "gentleFloat")
-
-        let fishDrift = CABasicAnimation(keyPath: "transform.translation.x")
-        fishDrift.fromValue = -18
-        fishDrift.toValue = 18
-        fishDrift.duration = 7
-        fishDrift.autoreverses = true
-        fishDrift.repeatCount = .infinity
-        fish.layer.add(fishDrift, forKey: "fishDrift")
-
+        let catVideoURL = URL(string: "https://cdn.openai.com/sora/videos/cat-on-bed.mp4")!
+        let catItem = AVPlayerItem(url: catVideoURL)
+        catsPlayer = AVQueuePlayer()
+        catsPlayer?.isMuted = true
+        catsLooper = AVPlayerLooper(player: catsPlayer!, templateItem: catItem)
+        catsLayer = AVPlayerLayer(player: catsPlayer)
+        catsLayer?.videoGravity = .resizeAspect
+        catsLayer?.frame = CGRect(x: 0, y: 0, width: 1, height: 1)
+        catVideoContainer.layer.addSublayer(catsLayer!)
+        catsVideoContainerReference = catVideoContainer
+        catVideoStatusReference = catVideoStatus
         catsView.isHidden = true
         stack.addArrangedSubview(catsView)
 
@@ -250,7 +241,19 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
         sourceHint.textColor = .lightGray
         sourceHint.font = .systemFont(ofSize: 12)
         sourceHint.numberOfLines = 0
-        style(customSourceField, placeholder: "URL своего M3U/M3U8-сервера")
+        style(serverField, placeholder: "Адрес IPTV-СИЛА сервера, например http://192.168.1.20:8765")
+        serverField.keyboardType = .URL
+        serverField.delegate = self
+        serverField.text = UserDefaults.standard.string(forKey: "serverURL")
+        let connect = UIButton(type: .system)
+        connect.setTitle("Подключить сервер", for: .normal)
+        connect.setTitleColor(.white, for: .normal)
+        connect.backgroundColor = UIColor(red: 36/255, green: 99/255, blue: 154/255, alpha: 1)
+        connect.layer.cornerRadius = 10
+        connect.heightAnchor.constraint(equalToConstant: 42).isActive = true
+        connect.addTarget(self, action: #selector(connectServer), for: .touchUpInside)
+
+        style(customSourceField, placeholder: "URL своего M3U/M3U8-плейлиста")
         customSourceField.keyboardType = .URL
         customSourceField.delegate = self
         customSourceField.text = UserDefaults.standard.string(forKey: "customSourceURL")
@@ -278,7 +281,7 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
         sourcesTable.separatorColor = .darkGray
         sourcesTable.rowHeight = 62
         sourcesTable.heightAnchor.constraint(equalToConstant: 260).isActive = true
-        let sourceStack = UIStackView(arrangedSubviews: [sourceTitle, sourceHint, customSourceField, customSourceButton, sourceCheck, sourcesStatus, sourcesTable])
+        let sourceStack = UIStackView(arrangedSubviews: [sourceTitle, sourceHint, serverField, connect, customSourceField, customSourceButton, sourceCheck, sourcesStatus, sourcesTable])
         sourceStack.axis = .vertical
         sourceStack.spacing = 10
         sourceStack.translatesAutoresizingMaskIntoConstraints = false
@@ -303,6 +306,7 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
         nowPlaying.isHidden = tvHidden
         sourcesView.isHidden = currentTab != 1
         catsView.isHidden = currentTab != 2
+        if currentTab == 2 { catsPlayer?.play() } else { catsPlayer?.pause() }
     }
 
     @objc private func connectServer() {

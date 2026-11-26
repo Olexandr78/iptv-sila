@@ -386,22 +386,22 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
     }
 
     private func loadSource(_ source: IPTVSource) {
-        sourcesStatus.text = "Загружаю \\(source.name)…"
+        sourcesStatus.text = "Загружаю \(source.name)…"
         URLSession.shared.dataTask(with: source.url) { [weak self] data, response, error in
             DispatchQueue.main.async {
                 guard let self = self else { return }
-                if let error = error { self.sourcesStatus.text = "Ошибка: \\(error.localizedDescription)"; return }
+                if let error = error { self.sourcesStatus.text = "Ошибка: \(error.localizedDescription)"; return }
                 guard let data = data, let text = String(data: data, encoding: .utf8) else {
                     self.sourcesStatus.text = "Не удалось прочитать M3U"; return
                 }
                 if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
-                    self.sourcesStatus.text = "HTTP \\(http.statusCode)"; return
+                    self.sourcesStatus.text = "HTTP \(http.statusCode)"; return
                 }
                 self.channels = self.parseM3U(text)
                 self.filtered = self.channels
                 self.channelTable.reloadData()
-                self.statusLabel.text = "Каналов: \\(self.channels.count) · \\(source.name)"
-                self.sourcesStatus.text = "Загружено каналов: \\(self.channels.count)"
+                self.statusLabel.text = "Каналов: \(self.channels.count) · \(source.name)"
+                self.sourcesStatus.text = "Загружено каналов: \(self.channels.count)"
             }
         }.resume()
     }
@@ -415,18 +415,18 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
             group.enter()
             URLSession.shared.dataTask(with: source.url) { data, response, error in
                 let result: String
-                if let error = error { result = "✗ \\(source.name): \\(error.localizedDescription)" }
-                else if let http = response as? HTTPURLResponse, http.statusCode >= 400 { result = "✗ \\(source.name): HTTP \\(http.statusCode)" }
+                if let error = error { result = "✗ \(source.name): \(error.localizedDescription)" }
+                else if let http = response as? HTTPURLResponse, http.statusCode >= 400 { result = "✗ \(source.name): HTTP \(http.statusCode)" }
                 else if let data = data, let text = String(data: data, encoding: .utf8), text.contains("#EXTM3U") {
                     let count = text.components(separatedBy: "#EXTINF").count - 1
-                    result = "✓ \\(source.name): M3U доступен, каналов — \\(count)"
-                } else { result = "✗ \\(source.name): ответ не M3U" }
+                    result = "✓ \(source.name): M3U доступен, каналов — \(count)"
+                } else { result = "✗ \(source.name): ответ не M3U" }
                 lock.lock(); results.append(result); lock.unlock()
                 group.leave()
             }.resume()
         }
         group.notify(queue: .main) {
-            self.sourcesStatus.text = results.joined(separator: "\\n")
+            self.sourcesStatus.text = results.joined(separator: "\n")
         }
     }
 

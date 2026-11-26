@@ -13,6 +13,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 }
 
+private struct IPTVSource {
+    let name: String
+    let detail: String
+    let url: URL
+}
+
 private struct Channel {
     let name: String
     let group: String
@@ -28,6 +34,11 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
     private var player: AVPlayer?
     private var playerLayer: AVPlayerLayer?
     private var currentTab = 0
+    private let sources: [IPTVSource] = [
+        IPTVSource(name: "iptv-org — Украина", detail: "Открытые каналы Украины", url: URL(string: "https://iptv-org.github.io/iptv/countries/ua.m3u")!),
+        IPTVSource(name: "Free-TV — Украина", detail: "Украинская подборка M3U8", url: URL(string: "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlists/playlist_ukraine.m3u8")!),
+        IPTVSource(name: "iptv-org — украинский язык", detail: "Украиноязычные каналы из разных стран", url: URL(string: "https://iptv-org.github.io/iptv/languages/ukr.m3u")!)
+    ]
 
     private let serverField = UITextField()
     private let searchField = UITextField()
@@ -37,6 +48,9 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
     private let nowPlaying = UILabel()
     private let content = UIView()
     private let catsView = UIView()
+    private let sourcesView = UIView()
+    private let sourcesTable = UITableView()
+    private let sourcesStatus = UILabel()
     private let scrollView = UIScrollView()
 
     override func viewDidLoad() {
@@ -81,7 +95,7 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
             root.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8)
         ])
 
-        let tabs = UISegmentedControl(items: ["Обычное ТВ", "🐈 Кошачий ТВ"])
+        let tabs = UISegmentedControl(items: ["ТВ", "🇺🇦 Источники", "🐈 Кошачий ТВ"])
         tabs.selectedSegmentIndex = 0
         tabs.addTarget(self, action: #selector(changeTab(_:)), for: .valueChanged)
         root.addArrangedSubview(tabs)
@@ -205,6 +219,48 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
 
         catsView.isHidden = true
         stack.addArrangedSubview(catsView)
+
+        sourcesView.backgroundColor = panel
+        sourcesView.layer.cornerRadius = 14
+        sourcesView.isHidden = true
+        let sourceTitle = UILabel()
+        sourceTitle.text = "🇺🇦 Украинские IPTV-источники"
+        sourceTitle.textColor = .white
+        sourceTitle.font = .boldSystemFont(ofSize: 20)
+        let sourceHint = UILabel()
+        sourceHint.text = "Проверяется доступность M3U и число каналов. Это не гарантирует воспроизведение каждого видеопотока."
+        sourceHint.textColor = .lightGray
+        sourceHint.font = .systemFont(ofSize: 12)
+        sourceHint.numberOfLines = 0
+        let sourceCheck = UIButton(type: .system)
+        sourceCheck.setTitle("Проверить все источники", for: .normal)
+        sourceCheck.setTitleColor(.white, for: .normal)
+        sourceCheck.backgroundColor = UIColor(red: 36/255, green: 99/255, blue: 154/255, alpha: 1)
+        sourceCheck.layer.cornerRadius = 10
+        sourceCheck.heightAnchor.constraint(equalToConstant: 42).isActive = true
+        sourceCheck.addTarget(self, action: #selector(checkAllSources), for: .touchUpInside)
+        sourcesStatus.text = "Выбери источник, чтобы загрузить его каналы."
+        sourcesStatus.textColor = .lightGray
+        sourcesStatus.font = .systemFont(ofSize: 12)
+        sourcesStatus.numberOfLines = 0
+        sourcesTable.dataSource = self
+        sourcesTable.delegate = self
+        sourcesTable.backgroundColor = panel
+        sourcesTable.separatorColor = .darkGray
+        sourcesTable.rowHeight = 62
+        sourcesTable.heightAnchor.constraint(equalToConstant: 260).isActive = true
+        let sourceStack = UIStackView(arrangedSubviews: [sourceTitle, sourceHint, sourceCheck, sourcesStatus, sourcesTable])
+        sourceStack.axis = .vertical
+        sourceStack.spacing = 10
+        sourceStack.translatesAutoresizingMaskIntoConstraints = false
+        sourcesView.addSubview(sourceStack)
+        NSLayoutConstraint.activate([
+            sourceStack.leadingAnchor.constraint(equalTo: sourcesView.leadingAnchor, constant: 12),
+            sourceStack.trailingAnchor.constraint(equalTo: sourcesView.trailingAnchor, constant: -12),
+            sourceStack.topAnchor.constraint(equalTo: sourcesView.topAnchor, constant: 12),
+            sourceStack.bottomAnchor.constraint(equalTo: sourcesView.bottomAnchor, constant: -12)
+        ])
+        stack.addArrangedSubview(sourcesView)
     }
 
     @objc private func changeTab(_ sender: UISegmentedControl) {
@@ -216,7 +272,8 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
         channelTable.isHidden = tvHidden
         videoContainer.isHidden = tvHidden
         nowPlaying.isHidden = tvHidden
-        catsView.isHidden = !tvHidden
+        sourcesView.isHidden = currentTab != 1
+        catsView.isHidden = currentTab != 2
     }
 
     @objc private func connectServer() {
@@ -280,9 +337,22 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
         channelTable.reloadData()
     }
 
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { filtered.count }
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        tableView === sourcesTable ? sources.count : filtered.count
+    }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        if tableView === sourcesTable {
+            let id = "source"
+            let cell = tableView.dequeueReusableCell(withIdentifier: id) ?? UITableViewCell(style: .subtitle, reuseIdentifier: id)
+            let source = sources[indexPath.row]
+            cell.textLabel?.text = source.name
+            cell.textLabel?.textColor = .white
+            cell.detailTextLabel?.text = source.detail + " · Нажми для загрузки"
+            cell.detailTextLabel?.textColor = .lightGray
+            cell.backgroundColor = panel
+            return cell
+        }
         let id = "channel"
         let cell = tableView.dequeueReusableCell(withIdentifier: id) ?? UITableViewCell(style: .subtitle, reuseIdentifier: id)
         let channel = filtered[indexPath.row]
@@ -295,6 +365,11 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
     }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        if tableView === sourcesTable {
+            loadSource(sources[indexPath.row])
+            tableView.deselectRow(at: indexPath, animated: true)
+            return
+        }
         let channel = filtered[indexPath.row]
         nowPlaying.text = channel.name
         player?.pause()
@@ -308,6 +383,51 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
         playerLayer = layer
         player?.play()
         tableView.deselectRow(at: indexPath, animated: true)
+    }
+
+    private func loadSource(_ source: IPTVSource) {
+        sourcesStatus.text = "Загружаю \\(source.name)…"
+        URLSession.shared.dataTask(with: source.url) { [weak self] data, response, error in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                if let error = error { self.sourcesStatus.text = "Ошибка: \\(error.localizedDescription)"; return }
+                guard let data = data, let text = String(data: data, encoding: .utf8) else {
+                    self.sourcesStatus.text = "Не удалось прочитать M3U"; return
+                }
+                if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+                    self.sourcesStatus.text = "HTTP \\(http.statusCode)"; return
+                }
+                self.channels = self.parseM3U(text)
+                self.filtered = self.channels
+                self.channelTable.reloadData()
+                self.statusLabel.text = "Каналов: \\(self.channels.count) · \\(source.name)"
+                self.sourcesStatus.text = "Загружено каналов: \\(self.channels.count)"
+            }
+        }.resume()
+    }
+
+    @objc private func checkAllSources() {
+        sourcesStatus.text = "Проверяю источники…"
+        let group = DispatchGroup()
+        var results: [String] = []
+        let lock = NSLock()
+        for source in sources {
+            group.enter()
+            URLSession.shared.dataTask(with: source.url) { data, response, error in
+                let result: String
+                if let error = error { result = "✗ \\(source.name): \\(error.localizedDescription)" }
+                else if let http = response as? HTTPURLResponse, http.statusCode >= 400 { result = "✗ \\(source.name): HTTP \\(http.statusCode)" }
+                else if let data = data, let text = String(data: data, encoding: .utf8), text.contains("#EXTM3U") {
+                    let count = text.components(separatedBy: "#EXTINF").count - 1
+                    result = "✓ \\(source.name): M3U доступен, каналов — \\(count)"
+                } else { result = "✗ \\(source.name): ответ не M3U" }
+                lock.lock(); results.append(result); lock.unlock()
+                group.leave()
+            }.resume()
+        }
+        group.notify(queue: .main) {
+            self.sourcesStatus.text = results.joined(separator: "\\n")
+        }
     }
 
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {

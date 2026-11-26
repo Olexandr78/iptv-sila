@@ -27,6 +27,7 @@ private data class Source(val name: String, val description: String, val url: St
 class MainActivity : AppCompatActivity() {
     private val sources = listOf(
         Source("iptv-org — Украина", "Открытые каналы Украины", "https://iptv-org.github.io/iptv/countries/ua.m3u"),
+        Source("IPTV Nexus — Украина", "181 украинский канал, автоматически обновляемый список", "https://dearbulut.github.io/iptv/playlists/country/ua.m3u"),
         Source("Free-TV — Украина", "Украинская подборка M3U8", "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlists/playlist_ukraine.m3u8"),
         Source("iptv-org — украинский язык", "Украиноязычные каналы", "https://iptv-org.github.io/iptv/languages/ukr.m3u")
     )

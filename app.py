@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtMultimediaWidgets import QVideoWidget
 from server_core import IPTVServer
+from sources import UkrainianSourcesPanel
 
 APP_DIR = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
 CONFIG = APP_DIR / "config.json"
@@ -88,6 +89,7 @@ class MainWindow(QMainWindow):
         buttons=QHBoxLayout(); self.server_button=QPushButton("▶ Запустить сервер"); self.server_button.clicked.connect(self.toggle_server); buttons.addWidget(self.server_button); sv.addLayout(buttons)
         self.server_info=QLabel("Сервер остановлен. После запуска адрес появится здесь."); self.server_info.setWordWrap(True); self.server_info.setStyleSheet("font-size:12pt;padding:15px;background:#1b2a40;border-radius:8px"); sv.addWidget(self.server_info); sv.addStretch()
         tabs.addTab(server_tab,"🖥 Сервер")
+        tabs.addTab(UkrainianSourcesPanel(self),"🇺🇦 Украинские источники")
         cats=CatsPanel(); tabs.addTab(cats,"🐈 Кошачий ТВ")
         self.setStatusBar(QStatusBar()); self.statusBar().showMessage("Готово")
         self.audio.setVolume(.7)

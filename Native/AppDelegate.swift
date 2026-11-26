@@ -33,6 +33,7 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
     private var filtered: [Channel] = []
     private var player: AVPlayer?
     private var playerLayer: AVPlayerLayer?
+    private var playerItemObservation: NSKeyValueObservation?
     private var currentTab = 0
     private let sources: [IPTVSource] = [
         IPTVSource(name: "iptv-org — Украина", detail: "Открытые каналы Украины", url: URL(string: "https://iptv-org.github.io/iptv/countries/ua.m3u")!),
@@ -329,7 +330,7 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
                 if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
                     self.statusLabel.text = "Сервер ответил HTTP \(http.statusCode)"; return
                 }
-                self.channels = self.parseM3U(text)
+                self.channels = self.parseM3U(text, baseURL: url)
                 self.filtered = self.channels
                 self.channelTable.reloadData()
                 self.statusLabel.text = "Каналов: \(self.channels.count)"
@@ -337,7 +338,7 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
         }.resume()
     }
 
-    private func parseM3U(_ text: String) -> [Channel] {
+    private func parseM3U(_ text: String, baseURL: URL? = nil) -> [Channel] {
         let lines = text.components(separatedBy: .newlines)
         var result: [Channel] = []
         var name: String?
@@ -351,7 +352,7 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
                     let value = String(line[range])
                     group = value.replacingOccurrences(of: #"^group-title="|"$"#, with: "", options: .regularExpression)
                 } else { group = "Каналы" }
-            } else if !line.isEmpty && !line.hasPrefix("#"), let channelName = name, let url = URL(string: line) {
+            } else if !line.isEmpty && !line.hasPrefix("#"), let channelName = name, let url = URL(string: line, relativeTo: baseURL)?.absoluteURL {
                 result.append(Channel(name: channelName, group: group, url: url))
                 name = nil
             }
@@ -405,9 +406,26 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
         videoPlaceholder.isHidden = true
         videoContainer.layoutIfNeeded()
         let item = AVPlayerItem(url: channel.url)
+        item.preferredForwardBufferDuration = 5
+        playerItemObservation = item.observe(\.status, options: [.initial, .new]) { [weak self] observedItem, _ in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                switch observedItem.status {
+                case .readyToPlay:
+                    self.statusLabel.text = "Поток подключён: \(channel.name)"
+                    self.player?.play()
+                case .failed:
+                    self.statusLabel.text = "Ошибка потока: \(observedItem.error?.localizedDescription ?? "неизвестная ошибка")"
+                default:
+                    self.statusLabel.text = "Подключаю поток: \(channel.name)…"
+                }
+            }
+        }
         player = AVPlayer(playerItem: item)
+        player?.automaticallyWaitsToMinimizeStalling = false
         let layer = AVPlayerLayer(player: player)
         layer.videoGravity = .resizeAspect
+        videoContainer.layoutIfNeeded()
         layer.frame = videoContainer.bounds
         videoContainer.layer.addSublayer(layer)
         playerLayer = layer

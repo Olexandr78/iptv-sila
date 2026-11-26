@@ -26,11 +26,17 @@ video{width:100%;background:#000;aspect-ratio:16/9;border-radius:14px}.hint{colo
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important}}
 </style></head>
 <body>
-<header><h1>📺 IPTV-СИЛА</h1><nav class="tabs"><button class="tab active" data-tab="tv">Обычное ТВ</button><button class="tab" data-tab="cats">🐈 Кошачий ТВ</button></nav></header>
+<header><h1>📺 IPTV-СИЛА</h1><nav class="tabs"><button class="tab active" data-tab="tv">Обычное ТВ</button><button class="tab" data-tab="sources">🇺🇦 Источники</button><button class="tab" data-tab="cats">🐈 Кошачий ТВ</button></nav></header>
 <main>
 <section id="tv" class="layout">
 <aside class="panel"><b>Каналы</b><input id="search" placeholder="Поиск канала…"><div class="hint" id="status">Загружаю плейлист…</div><div id="channels" class="channel-list"></div><p class="hint">Адрес сервера для мобильного приложения (например, http://192.168.1.20:8765):</p><input id="serverUrl" placeholder="http://IP-компьютера:8765"><button id="saveServer">Подключить сервер</button><p class="hint">На ПК можно оставить поле пустым. Плейлист хранится на сервере.</p></aside>
 <section class="panel"><video id="player" controls playsinline></video><h2 id="now">Выбери канал</h2><p class="hint">Клиент работает в браузере на Windows, Android и iPhone. Для HLS в некоторых браузерах используется hls.js.</p></section>
+</section>
+<section id="sources" class="panel hidden" style="max-width:1100px;margin:18px auto;padding:18px">
+<h2>🇺🇦 Украинские IPTV-источники</h2>
+<p class="hint">Открытые плейлисты. Проверка показывает доступность M3U и число записей каналов, но не гарантирует работу каждого видеопотока.</p>
+<div id="sourceList" class="channel-list"></div>
+<button id="checkSources">Проверить все источники</button>
 </section>
 <section id="cats" class="panel hidden" style="max-width:1100px;margin:18px auto;padding:18px">
 <h2>🐈 Кошачий ТВ</h2><p class="hint">Спокойная анимация с преобладанием синих и жёлтых оттенков — цветов, которые кошки различают лучше красных и зелёных. Это развлекательная визуализация, а не научно доказанная «идеальная» картинка для кошек.</p>
@@ -44,7 +50,16 @@ function parseM3U(text){const lines=text.split(/\r?\n/);let out=[],meta=null;for
 function render(){const q=$('#search').value.toLowerCase();list.replaceChildren();channels.filter(c=>(c.name+' '+c.group).toLowerCase().includes(q)).forEach(c=>{const b=document.createElement('button');b.className='channel';b.innerHTML='<span></span><small></small>';b.querySelector('span').textContent=c.name;b.querySelector('small').textContent=c.group;b.onclick=()=>play(c);list.append(b);});$('#status').textContent='Каналов: '+channels.length;}
 function play(c){$('#now').textContent=c.name;if(hls){hls.destroy();hls=null;}video.pause();video.removeAttribute('src');video.load();if(c.url.includes('.m3u8')&&window.Hls&&Hls.isSupported()){hls=new Hls();hls.loadSource(c.url);hls.attachMedia(video);hls.on(Hls.Events.MANIFEST_PARSED,()=>video.play().catch(()=>{}));}else{video.src=c.url;video.play().catch(()=>{});}}
 async function load(){try{if(!apiBase && !['127.0.0.1','localhost'].includes(location.hostname)){apiBase=prompt('Введи адрес IPTV-СИЛА сервера (например http://192.168.1.20:8765):')||'';apiBase=apiBase.replace(/\\/$/,'');if(apiBase){localStorage.setItem('iptvServer',apiBase);$('#serverUrl').value=apiBase;}}const r=await fetch(apiBase+'/api/playlist');if(!r.ok){let e={};try{e=await r.json()}catch{}throw Error(e.error||'HTTP '+r.status)}channels=parseM3U(await r.text());render();}catch(e){$('#status').textContent=e.message;}}
-$('#search').addEventListener('input',render);document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===b));$('#tv').classList.toggle('hidden',b.dataset.tab!=='tv');$('#cats').classList.toggle('hidden',b.dataset.tab!=='cats');});
+$('#search').addEventListener('input',render);document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===b));$('#tv').classList.toggle('hidden',b.dataset.tab!=='tv');$('#cats').classList.toggle('hidden',b.dataset.tab!=='cats');$('#sources').classList.toggle('hidden',b.dataset.tab!=='sources');});
+const IPTV_SOURCES=[
+{name:'iptv-org — Украина',url:'https://iptv-org.github.io/iptv/countries/ua.m3u',desc:'Открытые каналы Украины'},
+{name:'Free-TV — Украина',url:'https://raw.githubusercontent.com/Free-TV/IPTV/master/playlists/playlist_ukraine.m3u8',desc:'Украинская подборка M3U8'},
+{name:'iptv-org — украинский язык',url:'https://iptv-org.github.io/iptv/languages/ukr.m3u',desc:'Украиноязычные каналы из разных стран'}
+];
+function renderSources(){const root=$('#sourceList');root.replaceChildren();IPTV_SOURCES.forEach((s,i)=>{const card=document.createElement('div');card.className='panel';card.style.margin='8px 0';const title=document.createElement('b');title.textContent=s.name;const desc=document.createElement('p');desc.className='hint';desc.textContent=s.desc;const state=document.createElement('p');state.className='hint';state.id='sourceState'+i;state.textContent='Не проверен';const loadBtn=document.createElement('button');loadBtn.textContent='Загрузить каналы';loadBtn.onclick=()=>loadPublicSource(i);card.append(title,desc,state,loadBtn);root.append(card);});}
+async function checkOneSource(i){const s=IPTV_SOURCES[i],state=$('#sourceState'+i);state.textContent='Проверяю…';try{const r=await fetch(s.url,{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);const text=await r.text();const count=(text.match(/^#EXTINF/gm)||[]).length;if(!text.slice(0,512).includes('#EXTM3U'))throw Error('Ответ не M3U');state.textContent='✓ Плейлист доступен · каналов: '+count;}catch(e){state.textContent='✗ Ошибка: '+e.message+' (возможен CORS)';}}
+async function loadPublicSource(i){try{const r=await fetch(IPTV_SOURCES[i].url);if(!r.ok)throw Error('HTTP '+r.status);channels=parseM3U(await r.text());render();document.querySelector('[data-tab="tv"]').click();}catch(e){alert('Не удалось загрузить плейлист: '+e.message+'\\nЕсли это CORS, загрузите плейлист через локальный IPTV-СИЛА сервер.');}}
+$('#checkSources').onclick=()=>IPTV_SOURCES.forEach((_,i)=>checkOneSource(i));renderSources();
 let paused=false;$('#motion').onclick=()=>{paused=!paused;document.querySelector('.cat-stage').style.setProperty('--paused',paused?'paused':'running');document.querySelectorAll('.toy,.cat-stage:before,.cat-stage:after').forEach(x=>x.style.animationPlayState=paused?'paused':'running');$('#motion').textContent=paused?'Продолжить анимацию':'Пауза анимации';};
 load();
 </script></body></html>

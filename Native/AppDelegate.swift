@@ -186,6 +186,21 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
             channelFullscreen.trailingAnchor.constraint(equalTo: videoContainer.trailingAnchor, constant: -8),
             channelFullscreen.topAnchor.constraint(equalTo: videoContainer.topAnchor, constant: 8)
         ])
+        let channelPause = UIButton(type: .system)
+        channelPause.setTitle("⏸", for: .normal)
+        channelPause.setTitleColor(.white, for: .normal)
+        channelPause.titleLabel?.font = .systemFont(ofSize: 22, weight: .bold)
+        channelPause.backgroundColor = UIColor(white: 0.08, alpha: 0.85)
+        channelPause.layer.cornerRadius = 8
+        channelPause.translatesAutoresizingMaskIntoConstraints = false
+        channelPause.addTarget(self, action: #selector(toggleChannelPlayback), for: .touchUpInside)
+        videoContainer.addSubview(channelPause)
+        NSLayoutConstraint.activate([
+            channelPause.widthAnchor.constraint(equalToConstant: 42),
+            channelPause.heightAnchor.constraint(equalToConstant: 38),
+            channelPause.trailingAnchor.constraint(equalTo: channelFullscreen.leadingAnchor, constant: -6),
+            channelPause.topAnchor.constraint(equalTo: videoContainer.topAnchor, constant: 8)
+        ])
         stack.addArrangedSubview(videoContainer)
         nowPlaying.text = "Выбери канал"
         nowPlaying.textColor = .white
@@ -229,6 +244,21 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
             catFullscreen.heightAnchor.constraint(equalToConstant: 38),
             catFullscreen.trailingAnchor.constraint(equalTo: catVideoContainer.trailingAnchor, constant: -8),
             catFullscreen.topAnchor.constraint(equalTo: catVideoContainer.topAnchor, constant: 8)
+        ])
+        let catPause = UIButton(type: .system)
+        catPause.setTitle("⏸", for: .normal)
+        catPause.setTitleColor(.white, for: .normal)
+        catPause.titleLabel?.font = .systemFont(ofSize: 22, weight: .bold)
+        catPause.backgroundColor = UIColor(white: 0.08, alpha: 0.85)
+        catPause.layer.cornerRadius = 8
+        catPause.translatesAutoresizingMaskIntoConstraints = false
+        catPause.addTarget(self, action: #selector(toggleCatsPlayback), for: .touchUpInside)
+        catVideoContainer.addSubview(catPause)
+        NSLayoutConstraint.activate([
+            catPause.widthAnchor.constraint(equalToConstant: 42),
+            catPause.heightAnchor.constraint(equalToConstant: 38),
+            catPause.trailingAnchor.constraint(equalTo: catFullscreen.leadingAnchor, constant: -6),
+            catPause.topAnchor.constraint(equalTo: catVideoContainer.topAnchor, constant: 8)
         ])
         NSLayoutConstraint.activate([
             catVideoStatus.centerXAnchor.constraint(equalTo: catVideoContainer.centerXAnchor),
@@ -370,6 +400,28 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
         guard let raw = serverField.text?.trimmingCharacters(in: .whitespacesAndNewlines),
               let base = URL(string: raw), let url = URL(string: "/api/playlist", relativeTo: base)?.absoluteURL else { return }
         loadPlaylist(from: url, title: "IPTV-СИЛА сервер", status: sourcesStatus)
+    }
+
+    @objc private func toggleChannelPlayback(_ sender: UIButton) {
+        guard let player = player else { return }
+        if player.rate > 0 {
+            player.pause()
+            sender.setTitle("▶", for: .normal)
+        } else {
+            player.play()
+            sender.setTitle("⏸", for: .normal)
+        }
+    }
+
+    @objc private func toggleCatsPlayback(_ sender: UIButton) {
+        guard let player = catsPlayer else { return }
+        if player.rate > 0 {
+            player.pause()
+            sender.setTitle("▶", for: .normal)
+        } else {
+            player.play()
+            sender.setTitle("⏸", for: .normal)
+        }
     }
 
     @objc private func showChannelFullscreen() {

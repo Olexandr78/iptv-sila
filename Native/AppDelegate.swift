@@ -197,7 +197,7 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
             catVideoStatus.centerYAnchor.constraint(equalTo: catVideoContainer.centerYAnchor)
         ])
         let catCredit = UILabel()
-        catCredit.text = "Видео: NickyPe · Pixabay Content License"
+        catCredit.text = "Видео: Sora/OpenAI · общественное достояние (Wikimedia Commons)"
         catCredit.textColor = .lightGray
         catCredit.font = .systemFont(ofSize: 11)
         catCredit.textAlignment = .center
@@ -220,6 +220,12 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
         catsPlayer = AVQueuePlayer()
         catsPlayer?.isMuted = true
         catsLooper = AVPlayerLooper(player: catsPlayer!, templateItem: catItem)
+        _ = catItem.observe(\.status, options: [.initial, .new]) { [weak catVideoStatus] item, _ in
+            DispatchQueue.main.async {
+                if item.status == .readyToPlay { catVideoStatus?.isHidden = true }
+                else if item.status == .failed { catVideoStatus?.text = "Не удалось загрузить видео. Проверь интернет." }
+            }
+        }
         catsLayer = AVPlayerLayer(player: catsPlayer)
         catsLayer?.videoGravity = .resizeAspect
         catsLayer?.frame = CGRect(x: 0, y: 0, width: 1, height: 1)

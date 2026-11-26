@@ -1,4 +1,4 @@
-name: IPTV-SILA Android Native
+name: IPTV-SILA Android + Android TV
 on:
   workflow_dispatch:
   push:
@@ -7,7 +7,7 @@ permissions:
   contents: read
 jobs:
   android:
-    name: Build native Kotlin APK
+    name: Build Android phone/tablet and Android TV APKs
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,10 +18,17 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Build APK
-        run: gradle --no-daemon assembleDebug
-      - uses: actions/upload-artifact@v4
+      - name: Build Android APKs
+        run: gradle --no-daemon assembleStandardDebug assembleTvDebug
+      - name: Upload Android phone/tablet APK
+        uses: actions/upload-artifact@v4
         with:
-          name: IPTV-SILA-Android-native-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: IPTV-SILA-Android-debug
+          path: app/build/outputs/apk/standard/debug/app-standard-debug.apk
+          if-no-files-found: error
+      - name: Upload Android TV APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: IPTV-SILA-Android-TV-debug
+          path: app/build/outputs/apk/tv/debug/app-tv-debug.apk
           if-no-files-found: error

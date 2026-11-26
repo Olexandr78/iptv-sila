@@ -36,6 +36,7 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
     private var currentTab = 0
     private let sources: [IPTVSource] = [
         IPTVSource(name: "iptv-org — Украина", detail: "Открытые каналы Украины", url: URL(string: "https://iptv-org.github.io/iptv/countries/ua.m3u")!),
+        IPTVSource(name: "IPTV Nexus — Украина", detail: "181 украинский канал, автоматически обновляемый список", url: URL(string: "https://dearbulut.github.io/iptv/playlists/country/ua.m3u")!),
         IPTVSource(name: "Free-TV — Украина", detail: "Украинская подборка M3U8", url: URL(string: "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlists/playlist_ukraine.m3u8")!),
         IPTVSource(name: "iptv-org — украинский язык", detail: "Украиноязычные каналы из разных стран", url: URL(string: "https://iptv-org.github.io/iptv/languages/ukr.m3u")!)
     ]

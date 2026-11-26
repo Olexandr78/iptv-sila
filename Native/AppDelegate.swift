@@ -1,0 +1,270 @@
+import UIKit
+import AVFoundation
+
+@UIApplicationMain
+class AppDelegate: UIResponder, UIApplicationDelegate {
+    var window: UIWindow?
+
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        window = UIWindow(frame: UIScreen.main.bounds)
+        window?.rootViewController = IPTVViewController()
+        window?.makeKeyAndVisible()
+        return true
+    }
+}
+
+private struct Channel {
+    let name: String
+    let group: String
+    let url: URL
+}
+
+final class IPTVViewController: UIViewController, UITableViewDataSource, UITableViewDelegate, UITextFieldDelegate {
+    private let navy = UIColor(red: 11/255, green: 18/255, blue: 32/255, alpha: 1)
+    private let panel = UIColor(red: 21/255, green: 31/255, blue: 49/255, alpha: 1)
+    private let blue = UIColor(red: 99/255, green: 179/255, blue: 255/255, alpha: 1)
+    private var channels: [Channel] = []
+    private var filtered: [Channel] = []
+    private var player: AVPlayer?
+    private var playerLayer: AVPlayerLayer?
+    private var currentTab = 0
+
+    private let serverField = UITextField()
+    private let searchField = UITextField()
+    private let statusLabel = UILabel()
+    private let channelTable = UITableView()
+    private let videoContainer = UIView()
+    private let nowPlaying = UILabel()
+    private let content = UIView()
+    private let catsView = UIView()
+    private let scrollView = UIScrollView()
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = navy
+        title = "📺 IPTV-СИЛА"
+        navigationController?.navigationBar.barTintColor = navy
+        navigationController?.navigationBar.titleTextAttributes = [.foregroundColor: UIColor.white]
+        buildInterface()
+        let saved = UserDefaults.standard.string(forKey: "serverURL") ?? ""
+        serverField.text = saved
+        if !saved.isEmpty { loadPlaylist() }
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        playerLayer?.frame = videoContainer.bounds
+    }
+
+    private func style(_ field: UITextField, placeholder: String) {
+        field.placeholder = placeholder
+        field.backgroundColor = UIColor(red: 12/255, green: 21/255, blue: 36/255, alpha: 1)
+        field.textColor = .white
+        field.tintColor = blue
+        field.borderStyle = .roundedRect
+        field.autocapitalizationType = .none
+        field.autocorrectionType = .no
+        field.clearButtonMode = .whileEditing
+        field.heightAnchor.constraint(equalToConstant: 42).isActive = true
+    }
+
+    private func buildInterface() {
+        let root = UIStackView()
+        root.axis = .vertical
+        root.spacing = 12
+        root.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(root)
+        NSLayoutConstraint.activate([
+            root.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 14),
+            root.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -14),
+            root.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 10),
+            root.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8)
+        ])
+
+        let tabs = UISegmentedControl(items: ["Обычное ТВ", "🐈 Кошачий ТВ"])
+        tabs.selectedSegmentIndex = 0
+        tabs.addTarget(self, action: #selector(changeTab(_:)), for: .valueChanged)
+        root.addArrangedSubview(tabs)
+
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        root.addArrangedSubview(scrollView)
+        let stack = UIStackView()
+        stack.axis = .vertical
+        stack.spacing = 12
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+            stack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            stack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+            stack.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor)
+        ])
+
+        style(serverField, placeholder: "Адрес сервера, например http://192.168.1.20:8765")
+        serverField.keyboardType = .URL
+        serverField.delegate = self
+        stack.addArrangedSubview(serverField)
+        let connect = UIButton(type: .system)
+        connect.setTitle("Подключить сервер", for: .normal)
+        connect.setTitleColor(.white, for: .normal)
+        connect.backgroundColor = UIColor(red: 36/255, green: 99/255, blue: 154/255, alpha: 1)
+        connect.layer.cornerRadius = 10
+        connect.heightAnchor.constraint(equalToConstant: 42).isActive = true
+        connect.addTarget(self, action: #selector(connectServer), for: .touchUpInside)
+        stack.addArrangedSubview(connect)
+
+        style(searchField, placeholder: "Поиск канала…")
+        searchField.delegate = self
+        searchField.addTarget(self, action: #selector(searchChanged), for: .editingChanged)
+        stack.addArrangedSubview(searchField)
+
+        statusLabel.text = "Укажи адрес IPTV-СИЛА сервера"
+        statusLabel.textColor = .lightGray
+        statusLabel.font = .systemFont(ofSize: 13)
+        stack.addArrangedSubview(statusLabel)
+
+        channelTable.dataSource = self
+        channelTable.delegate = self
+        channelTable.backgroundColor = panel
+        channelTable.separatorColor = UIColor.darkGray
+        channelTable.rowHeight = 54
+        channelTable.layer.cornerRadius = 12
+        channelTable.heightAnchor.constraint(equalToConstant: 260).isActive = true
+        stack.addArrangedSubview(channelTable)
+
+        videoContainer.backgroundColor = .black
+        videoContainer.layer.cornerRadius = 12
+        videoContainer.clipsToBounds = true
+        videoContainer.heightAnchor.constraint(equalTo: videoContainer.widthAnchor, multiplier: 9.0/16.0).isActive = true
+        stack.addArrangedSubview(videoContainer)
+        nowPlaying.text = "Выбери канал"
+        nowPlaying.textColor = .white
+        nowPlaying.font = .boldSystemFont(ofSize: 18)
+        stack.addArrangedSubview(nowPlaying)
+
+        catsView.backgroundColor = UIColor(red: 7/255, green: 90/255, blue: 156/255, alpha: 1)
+        catsView.layer.cornerRadius = 18
+        catsView.heightAnchor.constraint(equalToConstant: 330).isActive = true
+        let fish = UILabel()
+        fish.text = "🐟       🦋"
+        fish.font = .systemFont(ofSize: 64)
+        fish.translatesAutoresizingMaskIntoConstraints = false
+        catsView.addSubview(fish)
+        NSLayoutConstraint.activate([
+            fish.centerXAnchor.constraint(equalTo: catsView.centerXAnchor),
+            fish.centerYAnchor.constraint(equalTo: catsView.centerYAnchor)
+        ])
+        catsView.isHidden = true
+        stack.addArrangedSubview(catsView)
+    }
+
+    @objc private func changeTab(_ sender: UISegmentedControl) {
+        currentTab = sender.selectedSegmentIndex
+        let tvHidden = currentTab != 0
+        serverField.isHidden = tvHidden
+        searchField.isHidden = tvHidden
+        statusLabel.isHidden = tvHidden
+        channelTable.isHidden = tvHidden
+        videoContainer.isHidden = tvHidden
+        nowPlaying.isHidden = tvHidden
+        catsView.isHidden = !tvHidden
+    }
+
+    @objc private func connectServer() {
+        view.endEditing(true)
+        guard let raw = serverField.text?.trimmingCharacters(in: .whitespacesAndNewlines),
+              let base = URL(string: raw), base.scheme != nil, base.host != nil else {
+            statusLabel.text = "Введи корректный адрес сервера"
+            return
+        }
+        UserDefaults.standard.set(raw, forKey: "serverURL")
+        loadPlaylist()
+    }
+
+    private func loadPlaylist() {
+        guard let raw = serverField.text?.trimmingCharacters(in: .whitespacesAndNewlines),
+              let base = URL(string: raw), let url = URL(string: "/api/playlist", relativeTo: base)?.absoluteURL else { return }
+        statusLabel.text = "Загружаю плейлист…"
+        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                if let error = error { self.statusLabel.text = "Ошибка: \(error.localizedDescription)"; return }
+                guard let data = data, let text = String(data: data, encoding: .utf8) else {
+                    self.statusLabel.text = "Не удалось прочитать плейлист"; return
+                }
+                if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+                    self.statusLabel.text = "Сервер ответил HTTP \(http.statusCode)"; return
+                }
+                self.channels = self.parseM3U(text)
+                self.filtered = self.channels
+                self.channelTable.reloadData()
+                self.statusLabel.text = "Каналов: \(self.channels.count)"
+            }
+        }.resume()
+    }
+
+    private func parseM3U(_ text: String) -> [Channel] {
+        let lines = text.components(separatedBy: .newlines)
+        var result: [Channel] = []
+        var name: String?
+        var group = "Каналы"
+        for raw in lines {
+            let line = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            if line.hasPrefix("#EXTINF") {
+                let parts = line.split(separator: ",", maxSplits: 1, omittingEmptySubsequences: false)
+                name = parts.count > 1 ? String(parts[1]).trimmingCharacters(in: .whitespaces) : "Без названия"
+                if let range = line.range(of: #"group-title="([^"]*)""#, options: .regularExpression) {
+                    let value = String(line[range])
+                    group = value.replacingOccurrences(of: #"^group-title="|"$"#, with: "", options: .regularExpression)
+                } else { group = "Каналы" }
+            } else if !line.isEmpty && !line.hasPrefix("#"), let channelName = name, let url = URL(string: line) {
+                result.append(Channel(name: channelName, group: group, url: url))
+                name = nil
+            }
+        }
+        return result
+    }
+
+    @objc private func searchChanged() {
+        let query = (searchField.text ?? "").lowercased()
+        filtered = query.isEmpty ? channels : channels.filter { $0.name.lowercased().contains(query) || $0.group.lowercased().contains(query) }
+        channelTable.reloadData()
+    }
+
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { filtered.count }
+
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let id = "channel"
+        let cell = tableView.dequeueReusableCell(withIdentifier: id) ?? UITableViewCell(style: .subtitle, reuseIdentifier: id)
+        let channel = filtered[indexPath.row]
+        cell.textLabel?.text = channel.name
+        cell.textLabel?.textColor = .white
+        cell.detailTextLabel?.text = channel.group
+        cell.detailTextLabel?.textColor = .lightGray
+        cell.backgroundColor = panel
+        return cell
+    }
+
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        let channel = filtered[indexPath.row]
+        nowPlaying.text = channel.name
+        player?.pause()
+        playerLayer?.removeFromSuperlayer()
+        let item = AVPlayerItem(url: channel.url)
+        player = AVPlayer(playerItem: item)
+        let layer = AVPlayerLayer(player: player)
+        layer.videoGravity = .resizeAspect
+        layer.frame = videoContainer.bounds
+        videoContainer.layer.addSublayer(layer)
+        playerLayer = layer
+        player?.play()
+        tableView.deselectRow(at: indexPath, animated: true)
+    }
+
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        textField.resignFirstResponder()
+        if textField === serverField { connectServer() }
+        return true
+    }
+}

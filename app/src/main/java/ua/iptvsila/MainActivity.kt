@@ -8,6 +8,7 @@ import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AlertDialog
 import androidx.core.view.setPadding
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer

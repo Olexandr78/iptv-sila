@@ -1,0 +1,24 @@
+name: IPTV-SILA
+options:
+  bundleIdPrefix: com.olexandr78
+  deploymentTarget:
+    iOS: "12.0"
+targets:
+  IPTV-SILA:
+    type: application
+    platform: iOS
+    deploymentTarget: "12.0"
+    sources:
+      - path: Native
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.olexandr78.iptvsila
+        PRODUCT_NAME: IPTV-СИЛА
+        INFOPLIST_KEY_CFBundleDisplayName: IPTV-СИЛА
+        INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads: YES
+        INFOPLIST_KEY_UIUserInterfaceStyle: Light
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.video
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SWIFT_VERSION: "5.0"
+        IPHONEOS_DEPLOYMENT_TARGET: "12.0"
+        CODE_SIGNING_ALLOWED: NO

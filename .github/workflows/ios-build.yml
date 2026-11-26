@@ -7,21 +7,43 @@ permissions:
   contents: read
 jobs:
   ios-device:
-    name: Build unsigned native iPhone IPA (iOS 12+)
+    name: Build AppSync ad-hoc iPhone IPA (iOS 12+)
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - name: Build for physical iPhone
         run: xcodebuild -project IPTV-SILA.xcodeproj -scheme IPTV-SILA -sdk iphoneos -configuration Release -derivedDataPath build-device CODE_SIGNING_ALLOWED=NO IPHONEOS_DEPLOYMENT_TARGET=12.0
-      - name: Package unsigned IPA
+      - name: Ad-hoc sign app for jailbroken devices
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="build-device/Build/Products/Release-iphoneos/IPTV-SILA.app"
+          mkdir -p signing
+          cat > signing/entitlements.plist <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>application-identifier</key><string>ua.iptvsila.ios</string>
+            <key>get-task-allow</key><true/>
+          </dict></plist>
+          PLIST
+          if [ -d "$APP/Frameworks" ]; then
+            while IFS= read -r -d '' binary; do
+              codesign --force --sign - --timestamp=none "$binary"
+            done < <(find "$APP/Frameworks" -type f -name '*.dylib' -print0)
+          fi
+          codesign --force --sign - --entitlements signing/entitlements.plist --generate-entitlement-der --timestamp=none "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          codesign -d --entitlements :- "$APP"
+      - name: Package AppSync IPA
         run: |
           mkdir -p Payload
           cp -R build-device/Build/Products/Release-iphoneos/IPTV-SILA.app Payload/
-          /usr/bin/zip -qry IPTV-SILA-iOS-unsigned-iOS12.ipa Payload
+          /usr/bin/zip -qry IPTV-SILA-iOS-AppSync-ad-hoc-iOS12.ipa Payload
       - uses: actions/upload-artifact@v4
         with:
-          name: IPTV-SILA-iPhone-unsigned-IPA-iOS12
-          path: IPTV-SILA-iOS-unsigned-iOS12.ipa
+          name: IPTV-SILA-iPhone-AppSync-ad-hoc-iOS12
+          path: IPTV-SILA-iOS-AppSync-ad-hoc-iOS12.ipa
           if-no-files-found: error
   ios-simulator:
     name: Build native Swift app for iOS Simulator

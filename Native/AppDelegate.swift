@@ -1,5 +1,6 @@
 import UIKit
 import AVFoundation
+import AVKit
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -36,6 +37,7 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
     private var playerItemObservation: NSKeyValueObservation?
     private var catsPlayer: AVQueuePlayer?
     private var catsLooper: AVPlayerLooper?
+    private var catsItemObservation: NSKeyValueObservation?
     private var catsLayer: AVPlayerLayer?
     private weak var catsVideoContainerReference: UIView?
     private weak var catVideoStatusReference: UILabel?
@@ -72,7 +74,14 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
         buildInterface()
         let saved = UserDefaults.standard.string(forKey: "serverURL") ?? ""
         serverField.text = saved
-        if !saved.isEmpty { loadPlaylist() }
+        if let lastURL = UserDefaults.standard.string(forKey: "lastPlaylistURL"),
+           let url = URL(string: lastURL) {
+            let lastTitle = UserDefaults.standard.string(forKey: "lastPlaylistTitle") ?? "Последний источник"
+            sourcesStatus.text = "Последний источник: \(lastTitle)"
+            loadPlaylist(from: url, title: lastTitle, status: sourcesStatus)
+        } else if !saved.isEmpty {
+            loadPlaylist()
+        }
         catsPlayer?.play()
     }
 
@@ -163,6 +172,21 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
             videoPlaceholder.trailingAnchor.constraint(equalTo: videoContainer.trailingAnchor, constant: -8),
             videoPlaceholder.centerYAnchor.constraint(equalTo: videoContainer.centerYAnchor)
         ])
+        let channelFullscreen = UIButton(type: .system)
+        channelFullscreen.setTitle("⛶", for: .normal)
+        channelFullscreen.setTitleColor(.white, for: .normal)
+        channelFullscreen.titleLabel?.font = .systemFont(ofSize: 25, weight: .bold)
+        channelFullscreen.backgroundColor = UIColor(white: 0.08, alpha: 0.8)
+        channelFullscreen.layer.cornerRadius = 8
+        channelFullscreen.translatesAutoresizingMaskIntoConstraints = false
+        channelFullscreen.addTarget(self, action: #selector(showChannelFullscreen), for: .touchUpInside)
+        videoContainer.addSubview(channelFullscreen)
+        NSLayoutConstraint.activate([
+            channelFullscreen.widthAnchor.constraint(equalToConstant: 42),
+            channelFullscreen.heightAnchor.constraint(equalToConstant: 38),
+            channelFullscreen.trailingAnchor.constraint(equalTo: videoContainer.trailingAnchor, constant: -8),
+            channelFullscreen.topAnchor.constraint(equalTo: videoContainer.topAnchor, constant: 8)
+        ])
         stack.addArrangedSubview(videoContainer)
         nowPlaying.text = "Выбери канал"
         nowPlaying.textColor = .white
@@ -192,6 +216,21 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
         catVideoStatus.font = .systemFont(ofSize: 14)
         catVideoStatus.translatesAutoresizingMaskIntoConstraints = false
         catVideoContainer.addSubview(catVideoStatus)
+        let catFullscreen = UIButton(type: .system)
+        catFullscreen.setTitle("⛶", for: .normal)
+        catFullscreen.setTitleColor(.white, for: .normal)
+        catFullscreen.titleLabel?.font = .systemFont(ofSize: 25, weight: .bold)
+        catFullscreen.backgroundColor = UIColor(white: 0.08, alpha: 0.8)
+        catFullscreen.layer.cornerRadius = 8
+        catFullscreen.translatesAutoresizingMaskIntoConstraints = false
+        catFullscreen.addTarget(self, action: #selector(showCatsFullscreen), for: .touchUpInside)
+        catVideoContainer.addSubview(catFullscreen)
+        NSLayoutConstraint.activate([
+            catFullscreen.widthAnchor.constraint(equalToConstant: 42),
+            catFullscreen.heightAnchor.constraint(equalToConstant: 38),
+            catFullscreen.trailingAnchor.constraint(equalTo: catVideoContainer.trailingAnchor, constant: -8),
+            catFullscreen.topAnchor.constraint(equalTo: catVideoContainer.topAnchor, constant: 8)
+        ])
         NSLayoutConstraint.activate([
             catVideoStatus.centerXAnchor.constraint(equalTo: catVideoContainer.centerXAnchor),
             catVideoStatus.centerYAnchor.constraint(equalTo: catVideoContainer.centerYAnchor)
@@ -215,21 +254,24 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
             catVideoContainer.heightAnchor.constraint(equalToConstant: 245)
         ])
 
-        let catVideoURL = URL(string: "https://cdn.openai.com/sora/videos/cat-on-bed.mp4")!
-        let catItem = AVPlayerItem(url: catVideoURL)
-        catsPlayer = AVQueuePlayer()
-        catsPlayer?.isMuted = true
-        catsLooper = AVPlayerLooper(player: catsPlayer!, templateItem: catItem)
-        _ = catItem.observe(\.status, options: [.initial, .new]) { [weak catVideoStatus] item, _ in
-            DispatchQueue.main.async {
-                if item.status == .readyToPlay { catVideoStatus?.isHidden = true }
-                else if item.status == .failed { catVideoStatus?.text = "Не удалось загрузить видео. Проверь интернет." }
+        if let catVideoURL = Bundle.main.url(forResource: "cat-on-bed", withExtension: "mp4") {
+            let catItem = AVPlayerItem(url: catVideoURL)
+            catsPlayer = AVQueuePlayer()
+            catsPlayer?.isMuted = true
+            catsLooper = AVPlayerLooper(player: catsPlayer!, templateItem: catItem)
+            catsItemObservation = catItem.observe(\.status, options: [.initial, .new]) { [weak catVideoStatus] item, _ in
+                DispatchQueue.main.async {
+                    if item.status == .readyToPlay { catVideoStatus?.isHidden = true }
+                    else if item.status == .failed { catVideoStatus?.text = "Не удалось открыть локальное видео кошек." }
+                }
             }
+            catsLayer = AVPlayerLayer(player: catsPlayer)
+            catsLayer?.videoGravity = .resizeAspect
+            catsLayer?.frame = CGRect(x: 0, y: 0, width: 1, height: 1)
+            catVideoContainer.layer.addSublayer(catsLayer!)
+        } else {
+            catVideoStatus.text = "Локальное видео не найдено в приложении."
         }
-        catsLayer = AVPlayerLayer(player: catsPlayer)
-        catsLayer?.videoGravity = .resizeAspect
-        catsLayer?.frame = CGRect(x: 0, y: 0, width: 1, height: 1)
-        catVideoContainer.layer.addSublayer(catsLayer!)
         catsVideoContainerReference = catVideoContainer
         catVideoStatusReference = catVideoStatus
         catsView.isHidden = true
@@ -329,7 +371,30 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
     private func loadPlaylist() {
         guard let raw = serverField.text?.trimmingCharacters(in: .whitespacesAndNewlines),
               let base = URL(string: raw), let url = URL(string: "/api/playlist", relativeTo: base)?.absoluteURL else { return }
-        statusLabel.text = "Загружаю плейлист…"
+        loadPlaylist(from: url, title: "IPTV-СИЛА сервер", status: sourcesStatus)
+    }
+
+    @objc private func showChannelFullscreen() {
+        guard let player = player else { return }
+        presentFullscreen(player: player)
+    }
+
+    @objc private func showCatsFullscreen() {
+        guard let player = catsPlayer else { return }
+        presentFullscreen(player: player)
+    }
+
+    private func presentFullscreen(player: AVPlayer) {
+        let controller = AVPlayerViewController()
+        controller.player = player
+        controller.modalPresentationStyle = .fullScreen
+        present(controller, animated: true) {
+            player.play()
+        }
+    }
+
+    private func loadPlaylist(from url: URL, title: String, status: UILabel) {
+        status.text = "Загружаю \(title)…"
         URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
             DispatchQueue.main.async {
                 guard let self = self else { return }
@@ -472,6 +537,8 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
                 }
                 let parsed = self.parseM3U(text)
                 guard !parsed.isEmpty else { status.text = "Плейлист пустой или не содержит корректных M3U-каналов"; return }
+                UserDefaults.standard.set(url.absoluteString, forKey: "lastPlaylistURL")
+                UserDefaults.standard.set(title, forKey: "lastPlaylistTitle")
                 self.channels = parsed
                 self.filtered = parsed
                 self.searchField.text = ""

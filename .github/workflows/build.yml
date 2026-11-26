@@ -8,9 +8,12 @@ permissions:
 jobs:
   ios-unsigned:
     name: Build unsigned iOS 12-compatible IPA
-    runs-on: macos-13
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '15.4'
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -22,10 +25,18 @@ jobs:
         run: |
           npm install --global cordova@11
           cordova platform add ios@6.2.0
+      - name: Locate Xcode project and scheme
+        id: project
+        run: |
+          PROJECT="$(find platforms/ios -maxdepth 1 -name '*.xcodeproj' -print -quit)"
+          test -n "$PROJECT"
+          SCHEME="$(xcodebuild -list -json -project "$PROJECT" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["project"]["schemes"][0])')"
+          echo "project=$PROJECT" >> "$GITHUB_OUTPUT"
+          echo "scheme=$SCHEME" >> "$GITHUB_OUTPUT"
       - name: Build for physical iOS devices without signing
         run: |
-          xcodebuild -project platforms/ios/IPTV-SILA.xcodeproj \
-            -scheme IPTV-SILA \
+          xcodebuild -project "${{ steps.project.outputs.project }}" \
+            -scheme "${{ steps.project.outputs.scheme }}" \
             -configuration Release \
             -sdk iphoneos \
             -derivedDataPath build \

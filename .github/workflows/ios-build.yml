@@ -1,0 +1,20 @@
+name: IPTV-SILA iOS Native
+on:
+  workflow_dispatch:
+  push:
+    branches: [ios]
+permissions:
+  contents: read
+jobs:
+  ios-simulator:
+    name: Build native Swift app for iOS Simulator
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build app
+        run: xcodebuild -project IPTV-SILA.xcodeproj -scheme IPTV-SILA -sdk iphonesimulator -configuration Debug -derivedDataPath build CODE_SIGNING_ALLOWED=NO
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IPTV-SILA-iOS-Simulator-app
+          path: build/Build/Products/Debug-iphonesimulator/IPTV-SILA.app
+          if-no-files-found: error

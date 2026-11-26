@@ -328,7 +328,7 @@ final class IPTVViewController: UIViewController, UITableViewDataSource, UITable
         sourcesTable.separatorColor = .darkGray
         sourcesTable.rowHeight = 62
         sourcesTable.heightAnchor.constraint(equalToConstant: 260).isActive = true
-        let sourceStack = UIStackView(arrangedSubviews: [serverField, connect, sourceTitle, sourceHint, customSourceField, customSourceButton, sourceCheck, sourcesStatus, sourcesTable])
+        let sourceStack = UIStackView(arrangedSubviews: [serverField, connect, sourcesStatus, sourceTitle, sourceHint, customSourceField, customSourceButton, sourceCheck, sourcesTable])
         sourceStack.axis = .vertical
         sourceStack.spacing = 10
         sourceStack.translatesAutoresizingMaskIntoConstraints = false

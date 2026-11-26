@@ -13,7 +13,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.olexandr78.iptvsila
-        PRODUCT_NAME: IPTV-СИЛА
+        PRODUCT_NAME: IPTV-SILA
         INFOPLIST_KEY_CFBundleDisplayName: IPTV-СИЛА
         INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads: YES
         INFOPLIST_KEY_UIUserInterfaceStyle: Light
